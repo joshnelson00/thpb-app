@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Index Page</title>
+	<link rel="stylesheet" href="static/styles.css">
+	<!-- Link to Font Awesome for icons -->
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+<body>
+	<div id="navbar">
+        <ul class="nav-links">
+            <li><a href="#">Home</a></li>
+            <li><a href="#">Home 1</a></li>
+            <li><a href="#">Home 2</a></li>
+            <li><a href="#">Home 3</a></li>
+        </ul>
+        <!-- Profile Picture with Username Initial -->
+        <div id="profile-picture"><a href="#">J</a></div>
+    </div>
+    
+    
+
+	{% block content %}
+	{% endblock %}
+	<footer>
+		<div class="footer-content">
+			<div class="footer-links">
+				<ul>
+					<li><a href="/">Home</a></li>
+					<li><a href="/privacy-policy">Privacy Policy</a></li>
+					<li><a href="https://github.com/yourusername" target="_blank">GitHub</a></li>
+					<li><a href="mailto:youremail@example.com">Email</a></li>
+				</ul>
+			</div>
+			<div class="footer-social">
+				<ul>
+					<li>
+						<a href="https://instagram.com/yourprofile" target="_blank">
+							<i class="fab fa-instagram"></i>
+						</a>
+					</li>
+					<li>
+						<a href="https://facebook.com/yourprofile" target="_blank">
+							<i class="fab fa-facebook"></i>
+						</a>
+					</li>
+					<li>
+						<a href="https://twitter.com/yourprofile" target="_blank">
+							<i class="fab fa-x-twitter"></i>
+						</a>
+					</li>
+				</ul>
+			</div>
+		</div>
+		<div class="footer-bottom">
+			<p>&copy; 2025 Your Company. All rights reserved.</p>
+		</div>
+	</footer>
+</body>
+</html>

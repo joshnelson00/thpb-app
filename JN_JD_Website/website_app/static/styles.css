@@ -1,0 +1,197 @@
+/* Reset default margin and padding for all elements */
+
+/* 
+Lighter Shades & Highlights:
+Sky Blue - #87CEEB (Soft, bright accent)
+Powder Blue - #B0E0E6 (Muted, pastel-like)
+Mint Green - #98FF98 (Cool and fresh)
+Darker Shades for Depth:
+Deep Teal - #006D77 (Richer alternative to Teal)
+Dark Cyan - #008B8B (Deeper and slightly muted)
+Charcoal - #36454F (Neutral, strong contrast)
+Neutral Complements:
+Light Gray - #D3D3D3 (Soft, neutral background)
+Cool Gray - #A9A9A9 (Darker neutral for contrast) 
+*/
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+@font-face {
+  font-family: "Roboto-Thin";
+  src: url(Roboto/static/Roboto-Thin.ttf);
+}
+
+@font-face {
+  font-family: "Roboto";
+  src: url(Roboto/static/Roboto-Regular.ttf);
+}
+
+body {
+  background-color: paleturquoise;
+  width: 100vw;
+  padding: 0;
+  margin: 0;
+  font-family: "Roboto";
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh; /* Ensure body takes at least the full viewport height */
+}
+
+#navbar {
+	display: flex;
+	justify-content: space-between; /* Spread items */
+	align-items: center;
+	padding: 2.5vh 3vw;
+	background-color: teal;
+	width: 100%;
+	font-size: 1.15rem;
+}
+
+/* Ensure navigation links stay aligned */
+.nav-links {
+	display: flex;
+	list-style-type: none;
+	padding: 0;
+	margin: 0;
+}
+
+.nav-links li {
+	display: inline-block;
+	padding: 0 0.75vw;
+}
+
+.nav-links li a {
+	text-decoration: none;
+	color: #ffffff;
+	display: block;
+    transition: color 0.3s ease;
+}
+
+.nav-links li a:hover {
+	color:#00bcd4;
+}
+
+/* Profile Picture Circle */
+#profile-picture {
+	width: 2.2rem;
+	height: 2.2rem;
+	border-radius: 50%;
+	background-color: #00bcd4; /* Profile background color */
+	color: white;
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	font-size: 1.2rem;
+	font-weight: bold;
+	text-transform: uppercase;
+	cursor: pointer;
+	border: 2px solid white;
+	margin-left: auto; /* Pushes it to the right */
+	transition: transform 0.3s ease, background-color 0.3s ease;
+}
+
+#profile-picture a {
+	text-decoration: none;
+    color: white;
+}
+
+/* Hover Effect */
+#profile-picture:hover {
+	transform: scale(1.1);
+	background-color: #0097a7; /* Darker shade */
+}
+
+/* Footer Styles */
+/* Footer Styles */
+/* Footer Styles */
+footer {
+	background-color: teal; /* Dark background for footer */
+	color: white;
+	padding: 1.5rem 1rem; /* Add padding */
+	margin-top: auto; /* Push footer to the bottom */
+}
+
+.footer-content {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	max-width: 1200px;
+	margin: 0 auto;
+	padding: 0 0;
+	flex-wrap: wrap;
+}
+
+/* Footer Links & Social */
+.footer-links ul,
+.footer-social ul {
+	list-style-type: none; /* Remove bullet points */
+	padding: 0;
+	margin: 0;
+	display: flex;
+	gap: 2rem; /* Add spacing between links */
+}
+
+.footer-links ul li,
+.footer-social ul li {
+	display: inline-block; /* Make list items horizontal */
+}
+
+.footer-links ul li a,
+.footer-social ul li a {
+	text-decoration: none; /* Remove underline from links */
+	color: white; /* Set link color */
+	font-size: 1rem;
+	transition: color 0.3s ease; /* Smooth color transition on hover */
+}
+
+.footer-links ul li a:hover,
+.footer-social ul li a:hover {
+	color: #00bcd4; /* Change color on hover */
+}
+
+.footer-social ul li a i {
+	font-size: 1.5rem; /* Increase icon size */
+}
+
+/* Footer Bottom Section */
+.footer-bottom {
+	text-align: center;
+	margin-top: 1.5rem;
+	padding-top: 1rem;
+	border-top: 1px solid #ffffff; /* Add a subtle border */
+}
+
+.footer-bottom p {
+	margin: 0;
+	font-size: 0.9rem;
+	color: #ccc; /* Light gray text for copyright */
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+	.footer-content {
+		display: grid;
+		grid-template-columns: repeat(2, 1fr); /* Keep two columns */
+		gap: 1rem;
+		text-align: center;
+	}
+
+	.footer-links ul,
+	.footer-social ul {
+		flex-direction: column;
+		align-items: center;
+		gap: 0.75rem; /* Adjust spacing */
+	}
+
+	.footer-links,
+	.footer-social {
+		width: 100%;
+		display: flex;
+		justify-content: center;
+	}
+}
+
