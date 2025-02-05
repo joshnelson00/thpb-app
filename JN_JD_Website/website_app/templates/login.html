@@ -6,31 +6,12 @@
     <title>Index Page</title>
     {% load static %}
     <link rel="stylesheet" href="{% static 'styles.css' %}">
-    <!-- Link to Font Awesome for icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 </head>
 <body>
-    <div id="navbar">
-        <ul class="nav-links">
-            <li><a href="#">Home</a></li>
-            <li><a href="#">Home 1</a></li>
-            <li><a href="#">Home 2</a></li>
-            <li><a href="#">Home 3</a></li>
-        </ul>
-        <!-- Profile Picture with Username Initial -->
-        <div id="profile-picture"><a href="#">J</a></div>
-    </div>
-    <div class="mobile-ad-container">
-        <div class="mobile-ad-box">Mobile Ad</div>
-    </div>
-    <div class="ad-container">
-        <div class="ad-box">Left Ad</div>
-            {% block content %}
-            {% endblock %}
-        <div class="ad-box">Right Ad</div>
-    </div>
     
-    
+        {% block content %}
+        {% endblock %}
     <footer>
         <div class="footer-content">
             <div class="footer-links">

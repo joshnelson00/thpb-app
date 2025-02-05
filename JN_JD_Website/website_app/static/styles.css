@@ -30,8 +30,12 @@ Cool Gray - #A9A9A9 (Darker neutral for contrast)
   src: url(Roboto/static/Roboto-Regular.ttf);
 }
 
+html {
+    height: 100%;
+	width:100%;
+}
 body {
-  background-color: paleturquoise;
+  background-color: #ffffff;
   width: 100vw;
   padding: 0;
   margin: 0;
@@ -41,12 +45,13 @@ body {
   min-height: 100vh; /* Ensure body takes at least the full viewport height */
 }
 
+
 #navbar {
 	display: flex;
 	justify-content: space-between; /* Spread items */
 	align-items: center;
-	padding: 2.5vh 3vw;
-	background-color: teal;
+	padding: 1.5vh 3vw;
+	background-color: #008080;
 	width: 100%;
 	font-size: 1.15rem;
 }
@@ -171,6 +176,93 @@ footer {
 	color: #ccc; /* Light gray text for copyright */
 }
 
+.content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 2vh 2vw 2vh 2vw;
+    background-color: #00bcd4;
+	margin:0;
+	width:100%;
+	height:100%;
+}
+
+.content h1 {
+    font-size: 2.5rem;
+}
+
+.ad-container {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    padding: 1% 1%;
+	margin: 0;
+}
+.ad-box {
+    width: 160px;
+    height: 600px;
+    background-color: #ffcc00; /* Placeholder background */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    font-weight: bold;
+    margin-top:20vh;
+}
+
+.mobile-ad-container {
+    display: none;
+    width: 100%;
+    text-align: center;
+    padding: 10px 0;
+    background-color: #f8f8f8;
+}
+
+.mobile-ad-box {
+    width: 320px; /* Standard mobile leaderboard size */
+    height: 50px;
+    background-color: #ffcc00; /* Placeholder background */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    font-weight: bold;
+    margin: 0 auto;
+    border-radius: 5px;
+}
+
+
+.signin-form input {
+    display: block;
+    width: 100%;
+    margin-bottom: 10px; /* Add spacing between inputs */
+}
+
+.signin-form {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    max-width: 400px; /* Optional: Set a max width */
+}
+
+.signin-form button {
+    width: 100%;
+    padding: 10px;
+    background-color: teal;
+    color: white;
+    border: none;
+    cursor: pointer;
+}
+
+
+
+@media (max-width: 1200px) {
+    .ad-box {
+        display: none; /* Hide on smaller screens */
+    }
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
 	.footer-content {
@@ -193,5 +285,8 @@ footer {
 		display: flex;
 		justify-content: center;
 	}
+	.mobile-ad-container {
+        display: block; /* Show on mobile devices */
+    }
 }
 
