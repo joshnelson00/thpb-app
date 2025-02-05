@@ -1,3 +1,7 @@
+import os
+from dotenv import load_dotenv
+
+
 """
 Django settings for JN_JD_Website project.
 
@@ -20,7 +24,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-!o@qk80(k4^e1+vq7vk)hrr*d8(bfdf2%3q1hk-(d1$^8)wj1w'
+
+
+load_dotenv()
+
+
+SECRET_KEY = os.getenv('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -115,6 +124,7 @@ USE_TZ = True
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.0/howto/static-files/
+
 
 STATIC_URL = 'static/'
 

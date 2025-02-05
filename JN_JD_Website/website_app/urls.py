@@ -1,8 +1,9 @@
 from django.urls import path
-from . import views  # Import your app's views
-
-app_name = 'website_app'  # Optional: Namespacing for reverse URL lookups
+from . import views
+from .views import *
 
 urlpatterns = [
-    path('', views.index, name='index'),
+    path('', views.index, name='about'),
+    path('login/', views.login, name='login'),
+    path('signin/', views.sign_in, name='signin'),
 ]

@@ -1,0 +1,18 @@
+{% extends 'login.html' %}
+{% load static %}
+
+{% block content %}
+<div class="content">
+    <form method="post">
+        {% csrf_token %}
+        <div class="signin-form">
+            {{ form.username }}
+            {{ form.password }}
+            <labe type="text">
+                {{ form.remember_me }} Remember Me
+            </label>
+            <button type="submit">Login</button>
+        </div>
+    </form>
+</div>
+{% endblock %}
