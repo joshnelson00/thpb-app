@@ -16,6 +16,10 @@
             <li><a href="#">Home 1</a></li>
             <li><a href="#">Home 2</a></li>
             <li><a href="#">Home 3</a></li>
+            <form action="{% url 'logout' %}" method="post">
+                {% csrf_token %}
+                <button type="submit">Logout</button>
+            </form>
         </ul>
         <!-- Profile Picture with Username Initial -->
         <div id="profile-picture"><a href="#">J</a></div>

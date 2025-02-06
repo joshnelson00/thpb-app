@@ -36,7 +36,7 @@ html {
 }
 body {
   background-color: #ffffff;
-  width: 100vw;
+  width: 100%;
   padding: 0;
   margin: 0;
   font-family: "Roboto";
@@ -176,15 +176,22 @@ footer {
 	color: #ccc; /* Light gray text for copyright */
 }
 
+.page-name {
+	margin: 0 0 2vh 0;
+}
+
+.send-content {
+	width:100%;
+}
+
 .content {
     display: flex;
     flex-direction: column;
     align-items: center;
     padding: 2vh 2vw 2vh 2vw;
-    background-color: #00bcd4;
-	margin:0;
+
+	margin:5vh 0 0 0;
 	width:100%;
-	height:100%;
 }
 
 .content h1 {
@@ -234,16 +241,18 @@ footer {
 
 .signin-form input {
     display: block;
-    width: 100%;
+    width: 25vw;
     margin-bottom: 10px; /* Add spacing between inputs */
 }
 
 .signin-form {
     display: flex;
     flex-direction: column;
-    align-items: center;
-    width: 100%;
-    max-width: 400px; /* Optional: Set a max width */
+    align-items: center; /* Optional: Set a max width */
+}
+
+.signin-form > * {
+	margin: 2vh 0;
 }
 
 .signin-form button {
@@ -255,7 +264,30 @@ footer {
     cursor: pointer;
 }
 
+.form-border {
+	border-width: 0.5rem;
+	border-radius: 2rem;
+	border-color: #6FB9A9;
+	border-style: solid;
+	padding: 3vw 5vw;
+}
+.remember-me-group {
+    display: flex;
+    align-items: center;
+    gap: 8px; /* Adjust spacing between checkbox and label */
+	justify-content: center;
+}
 
+.remember-me-box input {
+    width: 16px;
+    height: 16px;
+}
+
+.remember-me-group label {
+    font-size: 1.2rem; /* Adjust the size as needed */
+    font-weight: bold; /* Optional: Makes it stand out more */
+    cursor: pointer; /* Helps with usability */
+}
 
 @media (max-width: 1200px) {
     .ad-box {
@@ -279,7 +311,7 @@ footer {
 		gap: 0.75rem; /* Adjust spacing */
 	}
 
-	.footer-links,
+	.footer-links,				
 	.footer-social {
 		width: 100%;
 		display: flex;
@@ -288,5 +320,11 @@ footer {
 	.mobile-ad-container {
         display: block; /* Show on mobile devices */
     }
+
+	.signin-form > .textbox {
+		display: block;
+		width: 60vw;
+	}
+	
 }
 
