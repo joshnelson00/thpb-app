@@ -3,16 +3,26 @@
 
 {% block content %}
 <div class="content">
-    <form method="post">
-        {% csrf_token %}
-        <div class="signin-form">
-            {{ form.username }}
-            {{ form.password }}
-            <labe type="text">
-                {{ form.remember_me }} Remember Me
-            </label>
-            <button type="submit">Login</button>
-        </div>
-    </form>
+    <h1 class="page-name">Sign In</h1>
+    <div class="form-border">
+        <form method="post">
+            {% csrf_token %}
+            <div class="signin-form">
+                {{ form.username }}
+                {{ form.password }}
+                <div class="remember-me-group">
+                    <div class="remember-me-box">
+                        {{ form.remember_me }}
+                    </div>
+                    <label for="{{ form.remember_me.id_for_label }}">Remember Me</label>
+                    
+                </div>
+                <p><a href="#">Create Account</a></p>
+                <button type="submit">Login</button>
+                
+            </div>
+        </form>
+    </div>
+    
 </div>
 {% endblock %}
