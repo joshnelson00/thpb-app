@@ -1,0 +1,17 @@
+{% extends 'index.html' %}
+{% load static %}
+
+{% block content %}
+<div class="content">
+    <h1>Edit Event: {{ event.name }}</h1>
+    <div class="event-list-item">
+        <div class="event-list-date-block">
+            {{ event.date.day }}15 <!-- Day of the event -->
+            <div class="event-date-text">{{ event.date|date:"b" }}JAN </div> <!-- Month abbreviation -->
+        </div>
+        <div class="event-description-container">
+            {{ event.description }} This is a WBB for the GCU Pep Band, Under the direction of Kevin Bock
+        </div>
+    </div>
+</div>
+{% endblock %}

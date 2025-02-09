@@ -189,7 +189,6 @@ footer {
     flex-direction: column;
     align-items: center;
     padding: 2vh 2vw 2vh 2vw;
-
 	margin:5vh 0 0 0;
 	width:100%;
 }
@@ -287,6 +286,172 @@ footer {
     font-size: 1.2rem; /* Adjust the size as needed */
     font-weight: bold; /* Optional: Makes it stand out more */
     cursor: pointer; /* Helps with usability */
+}
+
+.group-container-wrapper {
+    display: flex;
+    flex-direction: row;
+    align-items: center; 
+    justify-content: flex-start; /* Ensures content starts from the left */
+    overflow-x: auto; /* Allows scrolling */
+    overflow-y: hidden;
+    border-color: #016c78;
+	border-radius: 25px;
+	border-width: 0.25rem;
+	border-style: solid;
+    width: 70vw;
+    height: 70%;
+    white-space: nowrap; /* Prevents wrapping */
+    padding: 0 1rem; /* Optional: Adds some spacing */
+}
+
+.group-container {
+    min-width: 19vw; /* Ensures minimum width for responsiveness */
+    height: 75vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    overflow: auto; /* Enables scrolling inside if needed */
+    margin: 1rem 1rem 1rem 1rem; /* Adds spacing between items */
+}
+
+.group-users {
+	width: 100%;
+	height: 100%;
+	margin: 1rem 0 0 0;
+	border-width: 0.25rem;
+	border-style: solid;
+	border-color: #0097a7;
+	border-radius: 25px;
+	overflow: auto; /* Enables scrolling inside if needed */
+	padding:1rem 1rem;
+
+}
+
+.movable-user {
+    cursor: grab;
+    background-color: #00bcd4;
+    padding: 10px;
+    border-radius: 5px;
+    margin: 5px;
+    color: white;
+    transition: transform 0.125s ease-in-out;
+}
+
+.movable-user:active {
+    transform: scale(1.05);
+}
+
+.hidden {
+    opacity: 0.5;
+}
+
+.user-group-container-wrapper {
+    width: 70vw;
+	height: 30vh;
+    overflow: auto;
+    border-style: solid;
+    border-width: 0.25rem;
+    border-color: #016c78;
+    border-radius: 25px;
+    margin: 0 0 2vh 0;
+    
+    display: flex;
+    flex-wrap: wrap; /* Enables wrapping */
+    gap: 1rem; /* Adds space between elements */
+    align-items: center; /* Aligns items properly */
+    justify-content: space-evenly; /* Ensures they align to the left */
+    padding: 1rem; /* Adds some spacing */
+}
+
+.movable-group-container {
+    display: flex;
+    gap: 2rem;
+}
+
+.movable-group-container-wrapper {
+    padding: 15px;
+    border-radius: 10px;
+    width: 25vw;
+    text-align: center;
+}
+
+.movable-groups {
+    height: 70vh;
+    border: 0.25rem solid #0097a7;
+    padding: 1vw;
+    border-radius: 25px;
+    margin: 1rem 0;
+    overflow: auto;
+}
+
+.movable-group {
+    background: #00bcd4;
+    color: white;
+    padding: 10px;
+    margin: 5px 0;
+    border-radius: 5px;
+    cursor: grab;
+    text-align: center;
+}
+
+.movable-group.hidden {
+    display: none;
+}
+
+.event-details-container {
+    width: 50vw;
+    height:30vh;
+    border: 0.25rem solid #999999;
+    border-radius: 25px;
+    display: flex;
+    align-items: center;
+    padding: 0 0 0 2rem;
+}
+
+.event-date-block {
+    width: 10rem;
+    height: 10rem;
+    background-color: #616161;
+    color: white;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-size:4rem;
+    border-radius: 25px;
+    font-family: "Roboto-Thin";
+}
+
+.event-date-text {
+    font-size:2.5rem;
+    color: white;
+    font-family: "Roboto";
+}
+
+.event-list-item{
+    width: 50vw;
+    height:20vh;
+    border: 0.25rem solid #999999;
+    border-radius: 25px;
+    display: flex;
+    align-items: center;
+    padding: 0 0 0 1.5rem;
+    margin:0.5rem;
+}
+
+.event-list-date-block {
+    width: 6.5rem;
+    height: 6.5rem;
+    background-color: #616161;
+    color: white;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-size:2.5rem;
+    border-radius: 15px;
+    font-family: "Roboto-Thin";
 }
 
 @media (max-width: 1200px) {

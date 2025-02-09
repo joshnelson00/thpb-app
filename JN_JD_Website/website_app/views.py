@@ -1,10 +1,13 @@
+import time
 from django.contrib.auth import authenticate
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import login as auth_login
 from django.http import HttpResponse
 from django.shortcuts import render, redirect
 from .forms import SignInForm
-
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+import json
 @login_required
 def home(request):
     # You can populate the context with data specific to the user or the page
@@ -40,3 +43,32 @@ def sign_in(request):
         'form': form
     }
     return render(request, 'signin.html', context)
+
+def edit_groups(request):
+    # This is the login page view
+
+    ## CONNECT TO PAGE AND SYNC WITH DB
+    context = {
+
+    }
+    return render(request, 'editgroups.html', context)
+
+def edit_event(request):
+    # This is the login page view
+
+    ## CONNECT TO PAGE AND SYNC WITH DB
+    timestamp = str(int(time.time()))
+    context = {
+        'timestamp': timestamp,
+    }
+    return render(request, 'editevent.html', context)
+
+
+def view_events(request):
+    # This is the login page view
+
+    context = {
+    }
+    return render(request, 'viewevents.html', context)
+
+
