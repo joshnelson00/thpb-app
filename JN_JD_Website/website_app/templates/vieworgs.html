@@ -1,0 +1,39 @@
+{% extends 'index.html' %}
+{% load static %}
+
+{% block content %}
+<div class="content">
+    <h1>Your Organizations</h1>
+    
+    {% if owned_organizations %}
+        <h2>Organizations You Own</h2>
+        <ul class="organization-list">
+            {% for org in owned_organizations %}
+                <li>
+                    <h3>{{ org.name }}</h3>
+                    <h4>Invite Code: {{ org.invite_code }}</h4>
+                    <!-- Only show the "View Groups" link if the user is the owner of the group -->
+                    <a href="{% url 'editgroups' org.id %}">View Groups</a>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p>You don't own any organizations yet.</p>
+    {% endif %}
+    
+    {% if member_organizations %}
+        <h2>Organizations You Are a Member Of</h2>
+        <ul class="organization-list">
+            {% for org in member_organizations %}
+                <li>
+                    <h3>{{ org.name }}</h3>
+                    <h4>Invite Code: {{ org.invite_code }}</h4>
+                    <!-- Hide the link to view groups here since user isn't the owner -->
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p>You are not a member of any organizations yet.</p>
+    {% endif %}
+</div>
+{% endblock %}

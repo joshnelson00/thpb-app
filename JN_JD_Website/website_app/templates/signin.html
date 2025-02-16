@@ -7,7 +7,7 @@
     <div class="form-border">
         <form method="post">
             {% csrf_token %}
-            <div class="signin-form">
+            <div class="form">
                 {{ form.username }}
                 {{ form.password }}
                 <div class="remember-me-group">
@@ -17,7 +17,7 @@
                     <label for="{{ form.remember_me.id_for_label }}">Remember Me</label>
                     
                 </div>
-                <p><a href="#">Create Account</a></p>
+                <p><a href="{% url 'createaccount' %}">Create Account</a></p>
                 <button type="submit">Login</button>
                 
             </div>

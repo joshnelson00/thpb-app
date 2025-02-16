@@ -1,6 +1,5 @@
 import os
-from dotenv import load_dotenv
-
+from dotenv import load_dotenv # type: ignore
 
 """
 Django settings for JN_JD_Website project.
@@ -109,6 +108,7 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+AUTH_USER_MODEL = 'website_app.User'
 
 # Internationalization
 # https://docs.djangoproject.com/en/5.0/topics/i18n/
@@ -134,5 +134,5 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-
-LOGOUT_REDIRECT_URL = '/login/'
+LOGIN_REDIRECT_URL = 'home'  # Redirect after successful login or account creation
+LOGIN_URL = 'signin'

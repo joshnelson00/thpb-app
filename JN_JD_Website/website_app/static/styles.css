@@ -45,7 +45,9 @@ body {
   min-height: 100vh; /* Ensure body takes at least the full viewport height */
 }
 
-
+ .logo-img {
+    width:10rem;
+ }
 #navbar {
 	display: flex;
 	justify-content: space-between; /* Spread items */
@@ -57,28 +59,61 @@ body {
 }
 
 /* Ensure navigation links stay aligned */
-.nav-links {
-	display: flex;
-	list-style-type: none;
-	padding: 0;
-	margin: 0;
-}
-
+/* Basic Styling */
 .nav-links li {
-	display: inline-block;
-	padding: 0 0.75vw;
+    display: inline-block;
+    padding: 0 0.75vw;
+    position: relative;
 }
 
 .nav-links li a {
-	text-decoration: none;
-	color: #ffffff;
-	display: block;
+    text-decoration: none;
+    color: #ffffff;
+    display: block;
     transition: color 0.3s ease;
 }
 
 .nav-links li a:hover {
-	color:#00bcd4;
+    color: #00bcd4;
 }
+
+/* Dropdown Menu */
+.dropdown {
+    position: relative;
+}
+
+.dropdown-menu {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    background-color: #005c5c;
+    list-style-type: none;
+    padding: 0;
+    min-width: 200px; /* Adjust width if needed */
+    border-radius: 0.5rem;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+}
+
+.dropdown-menu li {
+    padding: 0.5rem 1rem;
+}
+
+.dropdown-menu li a {
+    color: #ffffff;
+    text-decoration: none;
+    display: block;
+}
+
+.dropdown-menu li a:hover {
+    color: #00bcd4;
+}
+
+/* Show dropdown on hover */
+.dropdown:hover .dropdown-menu {
+    display: block;
+}
+
 
 /* Profile Picture Circle */
 #profile-picture {
@@ -237,24 +272,23 @@ footer {
     border-radius: 5px;
 }
 
-
-.signin-form input {
+.form input {
     display: block;
     width: 25vw;
     margin-bottom: 10px; /* Add spacing between inputs */
 }
 
-.signin-form {
+.form {
     display: flex;
     flex-direction: column;
     align-items: center; /* Optional: Set a max width */
 }
 
-.signin-form > * {
+.form > * {
 	margin: 2vh 0;
 }
 
-.signin-form button {
+.form button {
     width: 100%;
     padding: 10px;
     background-color: teal;

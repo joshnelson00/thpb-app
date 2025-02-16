@@ -3,15 +3,37 @@
 
 {% block content %}
 <div class="content">
-    <h1>Edit Event: {{ event.name }}</h1>
-    <div class="event-list-item">
-        <div class="event-list-date-block">
-            {{ event.date.day }}15 <!-- Day of the event -->
-            <div class="event-date-text">{{ event.date|date:"b" }}JAN </div> <!-- Month abbreviation -->
-        </div>
-        <div class="event-description-container">
-            {{ event.description }} This is a WBB for the GCU Pep Band, Under the direction of Kevin Bock
-        </div>
-    </div>
+    <h1>Upcoming Events</h1>
+    {% if events %}
+        {% for event in events %}
+            <div class="event-list-item">
+                <div class="event-list-date-block">
+                    {{ event.date.day }} 
+                    <div class="event-date-text">{{ event.date|date:"b" }}</div>
+                </div>
+                <div class="event-description-container">
+                    <h3>{{ event.name }}</h3>
+                    <p>{{ event.description }}</p>
+                    <p><strong>Organization:</strong> {{ event.organization.name }}</p>
+                    <p><strong>Location:</strong> {{ event.location }}</p>
+                    <p><strong>Groups Attending:</strong>
+                        {% if event.attending_groups %}
+                            <ul>
+                                {% for group in event.attending_groups %}
+                                    <li>{{ group.name }}</li>
+                                {% endfor %}
+                            </ul>
+                        {% else %}
+                            No groups attending yet.
+                        {% endif %}
+                    </p>
+                    <!-- Add Edit Event Link -->
+                    <p><a href="{% url 'editevent' event_id=event.id %}">Edit Event</a></p>
+                </div>
+            </div>
+        {% endfor %}
+    {% else %}
+        <p>No upcoming events found.</p>
+    {% endif %}
 </div>
 {% endblock %}

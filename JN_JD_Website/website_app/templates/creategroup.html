@@ -1,0 +1,15 @@
+{% extends 'index.html' %}
+{% load static %}
+
+{% block content %}
+<div class="content">
+    <h1>Create Group</h1>
+    <form method="post" class="form">
+        {% csrf_token %}
+        {{ form.name }}
+        {{ form.organization }}
+        <button type="submit">Submit</button>
+    </form>
+    
+</div>
+{% endblock %}
