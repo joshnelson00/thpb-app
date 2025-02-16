@@ -77,7 +77,8 @@ def edit_groups(request, org_id):
     # Get users who belong to the organization but are not in any group
     users_in_organization = UserOrganization.objects.filter(organization=organization).values_list('user', flat=True)
     users_in_groups = UserGroups.objects.filter(group__organization=organization).values_list('user', flat=True)
-    users_not_in_groups = UserOrganization.objects.filter(organization=organization).exclude(user__in=users_in_groups)
+    users_not_in_groups = User.objects.filter(id__in=users_in_organization).exclude(id__in=users_in_groups)
+
 
     # Get users in groups
     users_in_groups_set = User.objects.filter(id__in=users_in_groups)

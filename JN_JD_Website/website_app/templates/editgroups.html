@@ -6,7 +6,11 @@
     <h1>Edit Groups for {{ organization.name }}</h1>
     
     <div class="user-group-container-wrapper">
-        <div class="movable-user" id="user7">FIX THIS JOHN</div>
+        {% for user in users_not_in_groups %}
+        <div class="movable-user" id="user{{ user.id }}">{{ user.username }}</div>
+        {% empty %}
+        <p>No users available.</p>
+        {% endfor %}
     </div>
     
     <div class="group-container-wrapper">
@@ -17,9 +21,11 @@
             <h2 contenteditable="true" class="editable-group-name">{{ group.name }}</h2>
             
             <div class="group-users">
-                <!-- Loop through the users in this group -->
-                {% for user in group.users.all %}
+                <h4>Group Members:</h4>
+                {% for user in users_in_groups %}
+                {% if user in group.user_groups.all %}
                 <div class="movable-user" id="user{{ user.id }}">{{ user.username }}</div>
+                {% endif %}
                 {% endfor %}
             </div>
         </div>

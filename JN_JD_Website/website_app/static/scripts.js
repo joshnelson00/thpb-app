@@ -166,3 +166,39 @@ document.addEventListener("DOMContentLoaded", () => {
         groups.forEach(group => container.appendChild(group));
     }
 });
+document.addEventListener("DOMContentLoaded", () => {
+    const dropzones = document.querySelectorAll(".group-users, .user-group-container-wrapper");
+
+    dropzones.forEach(dropzone => {
+        dropzone.addEventListener("drop", async (event) => {
+            event.preventDefault();
+            const id = event.dataTransfer.getData("text/plain");
+            const draggedElement = document.getElementById(id);
+
+            if (draggedElement) {
+                dropzone.appendChild(draggedElement);
+                
+                const userId = id.replace("user", "");  // Extract user ID
+                const groupContainer = dropzone.closest(".group-container");
+                const groupId = groupContainer ? groupContainer.dataset.groupId : null;
+
+                // Send an update request to the server
+                await fetch("/update-user-group/", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-CSRFToken": getCSRFToken()
+                    },
+                    body: JSON.stringify({ user_id: userId, group_id: groupId })
+                })
+                .then(response => response.json())
+                .then(data => console.log("Update successful:", data))
+                .catch(error => console.error("Error updating user group:", error));
+            }
+        });
+    });
+
+    function getCSRFToken() {
+        return document.querySelector("[name=csrfmiddlewaretoken]").value;
+    }
+});
