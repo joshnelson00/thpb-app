@@ -21,7 +21,6 @@
             <h2 contenteditable="true" class="editable-group-name">{{ group.name }}</h2>
             
             <div class="group-users">
-                <h4>Group Members:</h4>
                 {% for user in users_in_groups %}
                 {% if user in group.user_groups.all %}
                 <div class="movable-user" id="user{{ user.id }}">{{ user.username }}</div>
