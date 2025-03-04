@@ -486,6 +486,10 @@ footer {
     margin-bottom: 2rem; /* Adds spacing between event details blocks */
 }
 
+.event-description-container {
+    margin: 0 0 0 5vw;
+}
+
 @media (max-width: 1200px) {
     .ad-box {
         display: none; /* Hide on smaller screens */

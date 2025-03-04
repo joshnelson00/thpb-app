@@ -17,4 +17,7 @@ urlpatterns = [
     path('joinorg/', views.join_org, name='joinorg'),
     path('get_groups_by_org/<int:org_id>/', views.get_groups_by_org, name='get_groups_by_org'),
     path('deleteorg/<int:org_id>/', views.delete_organization, name='delete_organization'),
+    path("update-user-group/", views.update_user_group, name="update_user_group"),
+    path("add-user-to-group/", views.add_user_to_group, name="add_user_to_group"),
+    path("remove-user-from-group/", views.remove_user_from_group, name="remove_user_from_group"),
 ]

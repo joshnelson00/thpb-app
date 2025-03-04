@@ -1,6 +1,7 @@
 from django.utils.timezone import now
 from django.contrib import messages
 import time
+
 from django.http import JsonResponse
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import login as auth_login
@@ -9,6 +10,8 @@ from .forms import SignInForm, CreateAccountForm, CreateOrganizationForm, Create
 from django.views.decorators.csrf import csrf_exempt
 from .models import Organization, Event, UserGroups, EventGroups, UserOrganization, Group, User
 from django.http import Http404
+
+
 
 @login_required
 def home(request):
@@ -71,25 +74,141 @@ def edit_groups(request, org_id):
     # Fetch the organization or raise a 404 if not found
     organization = get_object_or_404(Organization, id=org_id, owner=request.user)
     
-    # Fetch the groups associated with this organization
-    groups = organization.groups.all()  # Adjust this line based on how you relate groups to organizations
+    # Get all groups in the organization
+    groups = organization.groups.all()
 
-    # Get users who belong to the organization but are not in any group
-    users_in_organization = UserOrganization.objects.filter(organization=organization).values_list('user', flat=True)
-    users_in_groups = UserGroups.objects.filter(group__organization=organization).values_list('user', flat=True)
-    users_not_in_groups = User.objects.filter(id__in=users_in_organization).exclude(id__in=users_in_groups)
+    # Create a dictionary that holds the users in each group
+    users_in_groups = {}
+    for group in groups:
+        users_in_groups[group.id] = group.user_groups.values_list('user', flat=True)
 
+    # Get users who are not in any group in this organization
+    users_not_in_groups = User.objects.exclude(id__in=[user_id for user_list in users_in_groups.values() for user_id in user_list]).all()
 
-    # Get users in groups
-    users_in_groups_set = User.objects.filter(id__in=users_in_groups)
+    # Handle form submission for adding/removing users from groups
+    if request.method == "POST":
+        user_id = request.POST.get('user_id')
+        group_id = request.POST.get('group_id')
+        action = request.POST.get('action')
+        role = request.POST.get('role', None)  # Optional: for setting roles when adding users
 
+        if action == "add" and group_id and user_id:
+            user = get_object_or_404(User, id=user_id)
+            group = get_object_or_404(Group, id=group_id)
+            
+            # Add the user to the group with the specified role
+            UserGroups.objects.get_or_create(user=user, group=group, role=role)
+            messages.success(request, f"{user.username} was added to {group.name}.")
+        elif action == "remove" and group_id and user_id:
+            user = get_object_or_404(User, id=user_id)
+            group = get_object_or_404(Group, id=group_id)
+            
+            # Remove the user from the group
+            deleted_count, _ = UserGroups.objects.filter(user=user, group=group).delete()
+            if deleted_count:
+                messages.success(request, f"{user.username} was removed from {group.name}.")
+            else:
+                messages.warning(request, f"{user.username} was not found in {group.name}.")
+    
+    # Prepare context for rendering the template
     context = {
         'organization': organization,
         'groups': groups,
-        'users_in_groups': users_in_groups_set,  # Users in any group of the organization
-        'users_not_in_groups': users_not_in_groups,  # Users in the organization but not in a group
+        'users_in_groups': users_in_groups,
+        'users_not_in_groups': users_not_in_groups,
     }
     return render(request, 'editgroups.html', context)
+
+@login_required
+@csrf_exempt
+def update_user_group(request):
+    print("POST data received:", request.POST)
+
+    user_id = request.POST.get('user_id')
+    group_id = request.POST.get('group_id', None)
+    action = request.POST.get('action')
+
+    # Ensure user_id is valid
+    if not user_id or not user_id.isdigit():
+        return JsonResponse({"success": False, "message": "Invalid user ID"}, status=400)
+
+    # Ensure group_id is valid
+    if action == "add" and (not group_id or not group_id.isdigit()):
+        return JsonResponse({"success": False, "message": "Invalid group ID"}, status=400)
+
+    user = get_object_or_404(User, id=int(user_id))
+    print(f"User found: {user}")
+
+    response = {}
+
+    if action == "add":
+        group = get_object_or_404(Group, id=int(group_id))
+        print(f"Group found: {group}")
+
+        role = request.POST.get('role')
+        print(f"Role: {role}")
+
+        UserGroups.objects.get_or_create(user=user, group=group, role=role)
+        response["success"] = True
+        response["message"] = "User added to group successfully."
+        print("User added to group.")
+
+    elif action == "remove":
+        deleted_count, _ = UserGroups.objects.filter(user=user, group__id=group_id).delete()
+        if deleted_count:
+            response["success"] = True
+            response["message"] = "User removed from group successfully."
+            print("User removed from group.")
+        else:
+            response["success"] = False
+            response["message"] = "User not found in the specified group."
+            print("User not found in group.")
+
+    print("Response:", response)
+    return JsonResponse(response)
+
+
+
+def update_group_name(request):
+    group_name = request.POST.get('groupName')
+    group_id = request.POST.get('groupId')  # Get the group ID if needed
+
+    group = Group.objects.get(id=group_id)
+    group.name = group_name
+    group.save()
+
+    return JsonResponse({"success": True, "message": "Group name updated successfully."})
+
+
+@login_required
+@csrf_exempt
+def add_user_to_group(request):
+    if request.method == "POST":
+        user_id = request.POST.get("user_id")
+        group_id = request.POST.get("group_id")
+
+        user = get_object_or_404(User, id=user_id)
+        group = get_object_or_404(Group, id=group_id)
+
+        # Add user to group
+        UserGroups.objects.get_or_create(user=user, group=group)
+
+        return JsonResponse({"success": True, "message": f"{user.username} added to {group.name}"})
+
+@login_required
+@csrf_exempt
+def remove_user_from_group(request):
+    if request.method == "POST":
+        user_id = request.POST.get("user_id")
+        group_id = request.POST.get("group_id")
+
+        user = get_object_or_404(User, id=user_id)
+        group = get_object_or_404(Group, id=group_id)
+
+        # Remove user from group
+        UserGroups.objects.filter(user=user, group=group).delete()
+
+        return JsonResponse({"success": True, "message": f"{user.username} removed from {group.name}"})
 
 @login_required
 def delete_organization(request, org_id):
@@ -138,32 +257,29 @@ def edit_event(request, event_id):
 def view_events(request):
     # Get the groups the user is a member of
     user_groups = UserGroups.objects.filter(user=request.user).values_list('group', flat=True)
-    
-    # Get the organizations that the user belongs to through their groups
-    organizations = Organization.objects.filter(groups__in=user_groups).distinct()
 
-    # Get organization_id and group_id from GET parameters for filtering
+    # Get events associated with the user's groups
+    events = Event.objects.filter(
+    id__in=EventGroups.objects.filter(group__in=user_groups).values_list('event', flat=True),date__gte=now()).distinct()
+
+
+    # Optional filtering by organization or group
     organization_id = request.GET.get('organization_id')
     group_id = request.GET.get('group_id')
 
-    # Fetch events for the organizations the user is part of
-    events = Event.objects.filter(organization__in=organizations, date__gte=now()).distinct()
-
-    # Filter events by organization if selected
     if organization_id:
         events = events.filter(organization_id=organization_id)
-
-    # Filter events by group if selected
     if group_id:
         events = events.filter(groups__id=group_id).distinct()
 
-    # Get groups attending each event
+    # Attach attending groups to each event
     for event in events:
-        event.attending_groups = event.groups.all()
+        event.attending_groups = Group.objects.filter(events__event=event)
+
 
     context = {
         'events': events,
-        'organizations': organizations,
+        'organizations': Organization.objects.filter(groups__in=user_groups).distinct(),
         'selected_organization_id': organization_id,
         'selected_group_id': group_id,
     }
