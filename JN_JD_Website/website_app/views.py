@@ -1,6 +1,6 @@
 from django.utils.timezone import now
 from django.contrib import messages
-import time
+import time, json
 
 from django.http import JsonResponse
 from django.contrib.auth.decorators import login_required
@@ -80,10 +80,13 @@ def edit_groups(request, org_id):
     # Create a dictionary that holds the users in each group
     users_in_groups = {}
     for group in groups:
-        users_in_groups[group.id] = group.user_groups.values_list('user', flat=True)
+        # Get the UserGroups objects for this group
+        users_in_groups[group.id] = group.user_groups.select_related('user').all()
 
     # Get users who are not in any group in this organization
-    users_not_in_groups = User.objects.exclude(id__in=[user_id for user_list in users_in_groups.values() for user_id in user_list]).all()
+    users_not_in_groups = User.objects.exclude(
+        id__in=[user_group.user.id for group_users in users_in_groups.values() for user_group in group_users]
+    )
 
     # Handle form submission for adding/removing users from groups
     if request.method == "POST":
@@ -120,52 +123,79 @@ def edit_groups(request, org_id):
     return render(request, 'editgroups.html', context)
 
 @login_required
-@csrf_exempt
 def update_user_group(request):
-    print("POST data received:", request.POST)
+    print("Request method:", request.method)
+    print("Request content type:", request.content_type)
+    print("Request body:", request.body)
+    print("POST data:", request.POST)
 
-    user_id = request.POST.get('user_id')
-    group_id = request.POST.get('group_id', None)
-    action = request.POST.get('action')
-
-    # Ensure user_id is valid
-    if not user_id or not user_id.isdigit():
-        return JsonResponse({"success": False, "message": "Invalid user ID"}, status=400)
-
-    # Ensure group_id is valid
-    if action == "add" and (not group_id or not group_id.isdigit()):
-        return JsonResponse({"success": False, "message": "Invalid group ID"}, status=400)
-
-    user = get_object_or_404(User, id=int(user_id))
-    print(f"User found: {user}")
-
-    response = {}
-
-    if action == "add":
-        group = get_object_or_404(Group, id=int(group_id))
-        print(f"Group found: {group}")
-
-        role = request.POST.get('role')
-        print(f"Role: {role}")
-
-        UserGroups.objects.get_or_create(user=user, group=group, role=role)
-        response["success"] = True
-        response["message"] = "User added to group successfully."
-        print("User added to group.")
-
-    elif action == "remove":
-        deleted_count, _ = UserGroups.objects.filter(user=user, group__id=group_id).delete()
-        if deleted_count:
-            response["success"] = True
-            response["message"] = "User removed from group successfully."
-            print("User removed from group.")
+    try:
+        # Try to handle both JSON and form data
+        if request.content_type == 'application/json':
+            try:
+                data = json.loads(request.body)
+            except json.JSONDecodeError:
+                print("JSON decode error")
+                return JsonResponse({"success": False, "error": "Invalid JSON data"}, status=400)
         else:
-            response["success"] = False
-            response["message"] = "User not found in the specified group."
-            print("User not found in group.")
+            data = request.POST
 
-    print("Response:", response)
-    return JsonResponse(response)
+        print("Parsed data:", data)
+
+        user_id = data.get("user_id")
+        action = data.get("action")
+        group_id = data.get("group_id")
+
+        print(f"user_id: {user_id}, action: {action}, group_id: {group_id}")
+
+        # Rest of your existing validation logic...
+        if not user_id or not user_id.isdigit():
+            return JsonResponse({"success": False, "error": "Invalid user ID"}, status=400)
+
+        user = get_object_or_404(User, id=int(user_id))
+
+        if action == "add":
+            if not group_id or not group_id.isdigit():
+                return JsonResponse({"success": False, "error": "Invalid group ID"}, status=400)
+            
+            group = get_object_or_404(Group, id=int(group_id))
+            role = data.get("role", None)
+
+            # Add user to group
+            UserGroups.objects.get_or_create(user=user, group=group, role=role)
+            
+            return JsonResponse({
+                "success": True, 
+                "message": f"{user.username} added to {group.name}"
+            })
+
+        elif action == "remove":
+            if group_id:
+                # Remove from specific group
+                deleted_count, _ = UserGroups.objects.filter(
+                    user=user, 
+                    group__id=int(group_id)
+                ).delete()
+            else:
+                # Remove from all groups
+                deleted_count, _ = UserGroups.objects.filter(user=user).delete()
+
+            if deleted_count:
+                return JsonResponse({
+                    "success": True, 
+                    "message": "User removed successfully"
+                })
+            else:
+                return JsonResponse({
+                    "success": False, 
+                    "error": "User not found in any group"
+                }, status=404)
+
+        return JsonResponse({"success": False, "error": "Invalid action"}, status=400)
+
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+        return JsonResponse({"error": str(e)}, status=500)
 
 
 
@@ -275,7 +305,6 @@ def view_events(request):
     # Attach attending groups to each event
     for event in events:
         event.attending_groups = Group.objects.filter(events__event=event)
-
 
     context = {
         'events': events,

@@ -21,10 +21,8 @@
             <h2 contenteditable="true" class="editable-group-name">{{ group.name }}</h2>
             
             <div class="group-users">
-                {% for user_id in users_in_groups|get_item:group.id %}
-                    {% with user=user_id %}
-                        <div class="movable-user" id="user{{ user.id }}">{{ user.username }}</div>
-                    {% endwith %}
+                {% for user_group in users_in_groups|get_item:group.id %}
+                    <div class="movable-user" id="user{{ user_group.user.id }}">{{ user_group.user.username }}</div>
                 {% endfor %}
             </div>
         </div>
@@ -43,81 +41,121 @@
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script>
     $(document).ready(function () {
-        $(".movable-user").attr("draggable", true); // Ensure all movable users are draggable.
+    $(".movable-user").attr("draggable", true);
 
-        $(".movable-user").on("dragstart", function (event) {
-            event.originalEvent.dataTransfer.setData("user_id", $(this).attr("id").replace("user", ""));
+    $(".movable-user").on("dragstart", function (event) {
+        event.originalEvent.dataTransfer.setData("user_id", $(this).attr("id").replace("user", ""));
+    });
+
+    // Add user to group (via drop on a group container)
+    $(".group-container").on("dragover", function (event) {
+        event.preventDefault();
+    });
+
+    $(".group-container").on("drop", function (event) {
+        event.preventDefault();
+        let user_id = event.originalEvent.dataTransfer.getData("user_id");
+        let group_id = $(this).attr("data-group-id");
+
+        console.log("Sending data:", {
+            user_id: user_id,
+            group_id: group_id,
+            action: "add"
         });
 
-        // Add user to group (via drop on a group container)
-        $(".group-container").on("dragover", function (event) {
-            event.preventDefault();
-        });
-
-        $(".group-container").on("drop", function (event) {
-            event.preventDefault();
-            let user_id = event.originalEvent.dataTransfer.getData("user_id");
-            let group_id = $(this).attr("data-group-id");
-
-            // AJAX request to add user to group
-            $.post("{% url 'update_user_group' %}", {
+        $.ajax({
+            url: "{% url 'update_user_group' %}",
+            method: "POST",
+            contentType: "application/json",
+            data: JSON.stringify({
                 user_id: user_id,
                 group_id: group_id,
-                action: "add",
-                csrfmiddlewaretoken: "{{ csrf_token }}"
-            }, function (response) {
+                action: "add"
+            }),
+            headers: {
+                "X-CSRFToken": "{{ csrf_token }}"
+            },
+            success: function (response) {
+                console.log("Success response:", response);
                 if (response.success) {
                     $("#user" + user_id).appendTo("#group" + group_id + " .group-users");
                 } else {
-                    alert(response.error);
+                    console.error("Error:", response.error);
                 }
-            });
+            },
+            error: function (xhr, status, error) {
+                console.error("AJAX Error:", status, error);
+                console.error("Response Text:", xhr.responseText);
+            }
         });
+    });
 
-        // Remove user from group (via drop back into the user list)
-        $(".user-group-container-wrapper").on("dragover", function (event) {
-            event.preventDefault();
-        });
+    // Remove user from group (via drop back into the user list)
+    $(".user-group-container-wrapper").on("dragover", function (event) {
+        event.preventDefault();
+    });
 
-        $(".user-group-container-wrapper").on("drop", function (event) {
-            event.preventDefault();
-            let user_id = event.originalEvent.dataTransfer.getData("user_id");
+    $(".user-group-container-wrapper").on("drop", function (event) {
+        event.preventDefault();
+        let user_id = event.originalEvent.dataTransfer.getData("user_id");
 
-            // AJAX request to remove user from group
-            $.post("{% url 'update_user_group' %}", {
+        // Use $.ajax() for consistency
+        $.ajax({
+            url: "{% url 'update_user_group' %}",
+            method: "POST",
+            contentType: "application/json",
+            data: JSON.stringify({
                 user_id: user_id,
-                action: "remove",
-                csrfmiddlewaretoken: "{{ csrf_token }}"
-            }, function (response) {
+                action: "remove"
+            }),
+            headers: {
+                "X-CSRFToken": "{{ csrf_token }}"
+            },
+            success: function (response) {
                 if (response.success) {
                     $("#user" + user_id).appendTo(".user-group-container-wrapper");
                 } else {
-                    alert(response.error);
+                    console.error("Error:", response.error);
                 }
-            });
-        });
-
-        // Handle double-click to remove user from group (inside group)
-        $(".group-users").on("dblclick", ".movable-user", function () {
-            let user_id = $(this).attr("id").replace("user", "");
-            let group_id = $(this).closest(".group-container").attr("data-group-id");
-
-            // AJAX request to remove user from group
-            $.post("{% url 'update_user_group' %}", {
-                user_id: user_id,
-                group_id: group_id,
-                action: "remove",
-                csrfmiddlewaretoken: "{{ csrf_token }}"
-            }, function (response) {
-                if (response.success) {
-                    alert(response.message);
-                    $(this).remove();  // Remove the user from the UI
-                } else {
-                    alert(response.error);
-                }
-            });
+            },
+            error: function (xhr, status, error) {
+                console.error("AJAX Error:", status, error);
+            }
         });
     });
+
+    // Handle double-click to remove user from group (inside group)
+    $(".group-users").on("dblclick", ".movable-user", function () {
+        let user_id = $(this).attr("id").replace("user", "");
+        let group_id = $(this).closest(".group-container").attr("data-group-id");
+        let $userElement = $(this);
+
+        // Use $.ajax() for consistency
+        $.ajax({
+            url: "{% url 'update_user_group' %}",
+            method: "POST",
+            contentType: "application/json",
+            data: JSON.stringify({
+                user_id: user_id,
+                group_id: group_id,
+                action: "remove"
+            }),
+            headers: {
+                "X-CSRFToken": "{{ csrf_token }}"
+            },
+            success: function (response) {
+                if (response.success) {
+                    $userElement.remove();  // Remove the user from the UI
+                } else {
+                    console.error("Error:", response.error);
+                }
+            },
+            error: function (xhr, status, error) {
+                console.error("AJAX Error:", status, error);
+            }
+        });
+    });
+});
 </script>
 
 {% endblock %}
