@@ -82,8 +82,12 @@ document.addEventListener("DOMContentLoaded", () => {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
+                    "X-CSRFToken": "{{ csrf_token }}"
                 },
-                body: JSON.stringify({ groupName: newGroupName })
+                body: JSON.stringify({
+                    groupName: newGroupName,
+                    groupId: groupName.closest(".group-container").dataset.groupId
+                })
             })
             .then(response => response.json())
             .then(data => {
