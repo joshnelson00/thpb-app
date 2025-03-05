@@ -1,0 +1,81 @@
+{% extends 'index.html' %}
+{% load static %}
+
+{% block content %}
+<div class="content">
+    <h1>Create Event</h1>
+    <form method="post" class="form" id="create-event-form">
+        {% csrf_token %}
+        
+        <div class="form-group">
+            {{ form.name }}
+        </div>
+        <div class="form-group">
+            {{ form.description }}
+        </div>
+        <div class="form-group">
+            {{ form.date }}
+        </div>
+        <div class="form-group">
+            {{ form.location }}
+        </div>
+        <div class="form-group">
+            {{ form.organization }}
+        </div>
+
+        {% if form.errors %}
+            <div class="errors">
+                {% for field in form %}
+                    {% if field.errors %}
+                        <div class="error">
+                            {% for error in field.errors %}
+                                <p>{{ error }}</p>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        <div class="form-group">
+            <label for="id_groups">Select Groups</label>
+            <div id="id_groups">
+                <!-- Dynamically populated checkboxes will appear here -->
+            </div>
+        </div>
+
+        <button type="submit">Submit</button>
+    </form>
+</div>
+
+<script>
+    document.getElementById('id_organization').addEventListener('change', function () {
+        const orgId = this.value;
+        fetch(`/get_groups_by_org/${orgId}/`)
+            .then(response => response.json())
+            .then(data => {
+                const groupSelect = document.getElementById('id_groups');
+                groupSelect.innerHTML = '';  // Clear any previous options
+
+                data.groups.forEach(group => {
+                    const checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.name = 'groups';  // Ensure the name attribute is correct
+                    checkbox.value = group.id;
+                    checkbox.id = `group_${group.id}`;
+
+                    const label = document.createElement('label');
+                    label.setAttribute('for', `group_${group.id}`);
+                    label.innerText = group.name;
+
+                    const div = document.createElement('div');
+                    div.appendChild(checkbox);
+                    div.appendChild(label);
+                    groupSelect.appendChild(div);
+                });
+            });
+    });
+</script>
+
+
+{% endblock %}

@@ -1,0 +1,43 @@
+{% extends 'index.html' %}
+{% load static %}
+
+{% block content %}
+<div class="content">
+    <h1>Edit Event: {{ event.name }}</h1>
+    <div class="event-details-container">
+        <div class="event-date-block">
+            {{ event.date.day }} <!-- Day of the event -->
+            <div class="event-date-text">{{ event.date|date:"b" }}</div> <!-- Month abbreviation -->
+        </div>
+        <div class="event-description-container">
+            {{ event.description }}
+        </div>
+    </div>
+    <div class="movable-group-container">
+        <div class="movable-group-container-wrapper">
+            <h2>Available Groups</h2>
+            <div class="movable-groups" id="available-groups">
+                <div class="movable-group" id="group1">Group A</div>
+                <div class="movable-group" id="group2">Group B</div>
+                <div class="movable-group" id="group3">Group C</div>
+            </div>
+        </div>
+    
+        <div class="movable-group-container-wrapper">
+            <h2>Assigned Groups</h2>
+            <div class="movable-groups" id="assigned-groups">
+                <div class="movable-group" id="group4">Group D</div>
+                <div class="movable-group" id="group5">Group E</div>
+                <div class="movable-group" id="group6">Group F</div>
+                <div class="movable-group" id="group7">Group G</div>
+                <div class="movable-group" id="group8">Group H</div>
+                <div class="movable-group" id="group9">Group I</div>
+                <div class="movable-group" id="group10">Group J</div>
+                <div class="movable-group" id="group11">Group K</div>
+            </div>
+        </div>
+    </div>
+    
+    
+</div>
+{% endblock %}

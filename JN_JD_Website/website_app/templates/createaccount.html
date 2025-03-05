@@ -4,21 +4,44 @@
 {% block content %}
 <div class="content">
     <h1>Create Account</h1>
-    <form method="post">
-        {% csrf_token %}
-        <div class="signin-form">
-            {{ form.username }}
-            {{ form.password }}
-            <div class="remember-me-group">
-                <div class="remember-me-box">
-                    {{ form.remember_me }}
+    <div class="form-border">
+        <form method="post">
+            {% csrf_token %}
+            <div class="form">
+                {% for field in form %}
+                    {% if field.name != "remember_me" %}
+                        <div class="form-group">
+                            {{ field }}
+                            {% if field.errors %}
+                                <div class="error-message">
+                                    {% for error in field.errors %}
+                                        <p>{{ error }}</p>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                    {% endif %}
+                {% endfor %}
+                
+                <div class="remember-me-group">
+                    <div class="remember-me-box">
+                        {{ form.remember_me }}
+                    </div>
+                    <label for="{{ form.remember_me.id_for_label }}">Remember Me</label>
                 </div>
-                <label for="{{ form.remember_me.id_for_label }}">Remember Me</label>
+    
+                <button type="submit">Sign Up</button>
             </div>
-            <button type="submit">Login</button>
-            
-            
-        </div>
-    </form>
+    
+            {% if form.non_field_errors %}
+                <div class="error-message">
+                    {% for error in form.non_field_errors %}
+                        <p>{{ error }}</p>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        </form>
+    </div>
+    
 </div>
 {% endblock %}
