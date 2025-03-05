@@ -83,9 +83,15 @@ def edit_groups(request, org_id):
         # Get the UserGroups objects for this group
         users_in_groups[group.id] = group.user_groups.select_related('user').all()
 
+    org_users = organization.user_organizations.values_list('user', flat=True)
+    
     # Get users who are not in any group in this organization
-    users_not_in_groups = User.objects.exclude(
-        id__in=[user_group.user.id for group_users in users_in_groups.values() for user_group in group_users]
+    users_not_in_groups = User.objects.filter(
+        id__in=org_users
+    ).exclude(
+        id__in=UserGroups.objects.filter(
+            group__organization=organization
+        ).values_list('user_id', flat=True)
     )
 
     # Handle form submission for adding/removing users from groups
@@ -101,17 +107,12 @@ def edit_groups(request, org_id):
             
             # Add the user to the group with the specified role
             UserGroups.objects.get_or_create(user=user, group=group, role=role)
-            messages.success(request, f"{user.username} was added to {group.name}.")
         elif action == "remove" and group_id and user_id:
             user = get_object_or_404(User, id=user_id)
             group = get_object_or_404(Group, id=group_id)
             
             # Remove the user from the group
-            deleted_count, _ = UserGroups.objects.filter(user=user, group=group).delete()
-            if deleted_count:
-                messages.success(request, f"{user.username} was removed from {group.name}.")
-            else:
-                messages.warning(request, f"{user.username} was not found in {group.name}.")
+            UserGroups.objects.filter(user=user, group=group).delete()
     
     # Prepare context for rendering the template
     context = {
@@ -124,10 +125,6 @@ def edit_groups(request, org_id):
 
 @login_required
 def update_user_group(request):
-    print("Request method:", request.method)
-    print("Request content type:", request.content_type)
-    print("Request body:", request.body)
-    print("POST data:", request.POST)
 
     try:
         # Try to handle both JSON and form data
@@ -140,13 +137,10 @@ def update_user_group(request):
         else:
             data = request.POST
 
-        print("Parsed data:", data)
-
         user_id = data.get("user_id")
         action = data.get("action")
         group_id = data.get("group_id")
 
-        print(f"user_id: {user_id}, action: {action}, group_id: {group_id}")
 
         # Rest of your existing validation logic...
         if not user_id or not user_id.isdigit():
@@ -200,14 +194,25 @@ def update_user_group(request):
 
 
 def update_group_name(request):
-    group_name = request.POST.get('groupName')
-    group_id = request.POST.get('groupId')  # Get the group ID if needed
+    if request.method == "POST":
+        try:
+            data = json.loads(request.body)
+            group_name = data.get("groupName")
+            group_id = data.get("groupId")
 
-    group = Group.objects.get(id=group_id)
-    group.name = group_name
-    group.save()
+            if not group_id or not group_name:
+                return JsonResponse({"success": False, "error": "Missing group ID or name"}, status=400)
 
-    return JsonResponse({"success": True, "message": "Group name updated successfully."})
+            group = Group.objects.get(id=group_id)
+            group.name = group_name
+            group.save()
+
+            return JsonResponse({"success": True, "message": "Group name updated successfully."})
+
+        except Exception as e:
+            return JsonResponse({"success": False, "error": str(e)}, status=500)
+
+    return JsonResponse({"success": False, "error": "Invalid request"}, status=400)
 
 
 @login_required
@@ -285,13 +290,19 @@ def edit_event(request, event_id):
 
 @login_required
 def view_events(request):
-    # Get the groups the user is a member of
-    user_groups = UserGroups.objects.filter(user=request.user).values_list('group', flat=True)
+    # Get organizations the user owns
+    owned_organizations = Organization.objects.filter(owner=request.user)
 
-    # Get events associated with the user's groups
-    events = Event.objects.filter(
-    id__in=EventGroups.objects.filter(group__in=user_groups).values_list('event', flat=True),date__gte=now()).distinct()
-
+    if owned_organizations.exists():
+        # If user owns organizations, show all events from those organizations
+        events = Event.objects.filter(organization__in=owned_organizations, date__gte=now()).distinct()
+    else:
+        # Otherwise, get events based on group membership
+        user_groups = UserGroups.objects.filter(user=request.user).values_list('group', flat=True)
+        events = Event.objects.filter(
+            id__in=EventGroups.objects.filter(group__in=user_groups).values_list('event', flat=True),
+            date__gte=now()
+        ).distinct()
 
     # Optional filtering by organization or group
     organization_id = request.GET.get('organization_id')
@@ -308,7 +319,7 @@ def view_events(request):
 
     context = {
         'events': events,
-        'organizations': Organization.objects.filter(groups__in=user_groups).distinct(),
+        'organizations': Organization.objects.filter(groups__in=user_groups).distinct() if not owned_organizations.exists() else owned_organizations,
         'selected_organization_id': organization_id,
         'selected_group_id': group_id,
     }
@@ -364,11 +375,6 @@ def create_org(request):
     }
     return render(request, 'createorg.html', context)
 
-def get_groups_by_org(request, org_id):
-    organization = get_object_or_404(Organization, id=org_id)
-    groups = organization.groups.all()
-    group_data = [{"id": group.id, "name": group.name} for group in groups]
-    return JsonResponse({'groups': group_data})
 
 
 @login_required
