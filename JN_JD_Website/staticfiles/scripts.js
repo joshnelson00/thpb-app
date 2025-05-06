@@ -16,7 +16,6 @@ document.addEventListener("DOMContentLoaded", () => {
             event.target.classList.remove("hidden");
         });
     });
-
     // Add event listeners for drop zones
     dropzones.forEach(dropzone => {
         dropzone.addEventListener("dragover", (event) => {

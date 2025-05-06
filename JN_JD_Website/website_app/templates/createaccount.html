@@ -2,46 +2,202 @@
 {% load static %}
 
 {% block content %}
-<div class="content">
-    <h1>Create Account</h1>
+    <h1 class="page-name"><i class="fas fa-user-plus"></i> Create Account</h1>
     <div class="form-border">
-        <form method="post">
+        <form method="post" class="auth-form">
             {% csrf_token %}
             <div class="form">
-                {% for field in form %}
-                    {% if field.name != "remember_me" %}
-                        <div class="form-group">
-                            {{ field }}
-                            {% if field.errors %}
-                                <div class="error-message">
-                                    {% for error in field.errors %}
-                                        <p>{{ error }}</p>
-                                    {% endfor %}
-                                </div>
-                            {% endif %}
+                <div class="form-group">
+                    <div class="form-label">
+                        <i class="fas fa-user"></i>
+                        First Name
+                    </div>
+                    {{ form.f_name }}
+                    {% if form.f_name.errors %}
+                        <div class="error-message">
+                            {% for error in form.f_name.errors %}
+                                <p>{{ error }}</p>
+                            {% endfor %}
                         </div>
                     {% endif %}
-                {% endfor %}
-                
-                <div class="remember-me-group">
-                    <div class="remember-me-box">
-                        {{ form.remember_me }}
+                </div>
+                <div class="form-group">
+                    <div class="form-label">
+                        <i class="fas fa-user"></i>
+                        Last Name
                     </div>
-                    <label for="{{ form.remember_me.id_for_label }}">Remember Me</label>
+                    {{ form.l_name }}
+                    {% if form.l_name.errors %}
+                        <div class="error-message">
+                            {% for error in form.l_name.errors %}
+                                <p>{{ error }}</p>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
                 </div>
-    
-                <button type="submit">Sign Up</button>
+                <div class="form-group">
+                    <div class="form-label">
+                        <i class="fas fa-at"></i>
+                        Username
+                    </div>
+                    {{ form.username }}
+                    {% if form.username.errors %}
+                        <div class="error-message">
+                            {% for error in form.username.errors %}
+                                <p>{{ error }}</p>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+                <div class="form-group">
+                    <div class="form-label">
+                        <i class="fas fa-lock"></i>
+                        Password
+                    </div>
+                    {{ form.password1 }}
+                    {% if form.password1.errors %}
+                        <div class="error-message">
+                            {% for error in form.password1.errors %}
+                                <p>{{ error }}</p>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+                <div class="form-group">
+                    <div class="form-label">
+                        <i class="fas fa-lock"></i>
+                        Confirm Password
+                    </div>
+                    {{ form.password2 }}
+                    {% if form.password2.errors %}
+                        <div class="error-message">
+                            {% for error in form.password2.errors %}
+                                <p>{{ error }}</p>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+                <div class="auth-links">
+                    <a href="{% url 'signin' %}" class="create-account-link">
+                        <i class="fas fa-sign-in-alt"></i> Sign In
+                    </a>
+                </div>
+                <button type="submit" class="submit-button">
+                    <i class="fas fa-user-plus"></i> Create Account
+                </button>
             </div>
-    
-            {% if form.non_field_errors %}
-                <div class="error-message">
-                    {% for error in form.non_field_errors %}
-                        <p>{{ error }}</p>
-                    {% endfor %}
-                </div>
-            {% endif %}
         </form>
     </div>
-    
-</div>
+
+<style>
+.auth-form {
+    max-width: 400px;
+    margin: 0 auto;
+}
+
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--text-light);
+    font-weight: 500;
+    margin-bottom: 0.75rem;
+}
+
+.form-label i {
+    color: var(--periwinkle);
+    width: 16px;
+}
+
+.form-group input {
+    width: 100%;
+    padding: 0.75rem;
+    background: var(--darker-bg);
+    border: 1px solid var(--medium-blue-slate);
+    border-radius: 8px;
+    font-size: 1rem;
+    color: var(--text-light);
+    transition: all 0.3s ease;
+}
+
+.form-group input:focus {
+    border-color: var(--periwinkle);
+    box-shadow: 0 0 0 2px var(--medium-blue-slate);
+    outline: none;
+}
+
+.auth-links {
+    text-align: center;
+    margin-bottom: 1.5rem;
+}
+
+.create-account-link {
+    color: var(--periwinkle);
+    text-decoration: none;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.create-account-link:hover {
+    color: var(--text-light);
+    transform: translateY(-2px);
+}
+
+.submit-button {
+    width: 100%;
+    padding: 0.75rem;
+    background: linear-gradient(to right, var(--medium-blue-slate) 0%, var(--periwinkle) 100%);
+    color: var(--white);
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.submit-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.error-message {
+    color: #dc3545;
+    font-size: 0.875rem;
+    margin-top: 0.25rem;
+}
+
+.error-message p {
+    margin: 0;
+}
+
+.page-name {
+    color: var(--text-light);
+    text-align: center;
+    margin-bottom: 1.5rem;
+    font-size: 2rem;
+    font-weight: 500;
+}
+
+.form-border {
+    background: linear-gradient(to bottom, var(--card-bg) 0%, var(--dark-bg) 100%);
+    border-radius: 12px;
+    padding: 2rem;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--medium-blue-slate);
+    max-width: 500px;
+    margin: 0 auto;
+}
+</style>
 {% endblock %}

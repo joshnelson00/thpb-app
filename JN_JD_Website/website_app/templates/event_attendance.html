@@ -1,0 +1,168 @@
+{% extends 'index.html' %}
+{% load static %}
+
+{% block title %}Event Attendance{% endblock %}
+
+{% block content %}
+<div class="content">
+    <div class="event-attendance">
+        <h1>Attendance for {{ event.name }}</h1>
+        <div class="attendance-summary">
+            <div class="summary-card">
+                <h3>Attendance Summary</h3>
+                <div class="summary-stats">
+                    <div class="stat">
+                        <span class="label">Total Expected:</span>
+                        <span class="value">{{ total_expected }}</span>
+                    </div>
+                    <div class="stat">
+                        <span class="label">Total Attended:</span>
+                        <span class="value">{{ total_attended }}</span>
+                    </div>
+                    <div class="stat">
+                        <span class="label">Attendance Rate:</span>
+                        <span class="value">{{ attendance_rate|floatformat:1 }}%</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="attendance-lists">
+            <div class="attended-section">
+                <h2>Attended ({{ attended|length }})</h2>
+                <div class="user-list">
+                    {% for user in attended %}
+                    <div class="user-card">
+                        <div class="user-info">
+                            <span class="user-name">{{ user.username }}</span>
+                            <span class="check-in-time">Checked in at {{ user.eventcheckin_set.first.check_in_time|time:"g:i A" }}</span>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <p class="no-data">No attendees yet</p>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="absent-section">
+                <h2>Absent ({{ absent|length }})</h2>
+                <div class="user-list">
+                    {% for user in absent %}
+                    <div class="user-card">
+                        <div class="user-info">
+                            <span class="user-name">{{ user.username }}</span>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <p class="no-data">Everyone attended!</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .event-attendance {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 2rem;
+    }
+
+    .attendance-summary {
+        margin-bottom: 2rem;
+    }
+
+    .summary-card {
+        background: var(--card-bg);
+        border-radius: 8px;
+        padding: 1.5rem;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .summary-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin-top: 1rem;
+    }
+
+    .stat {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 1rem;
+        background: var(--darker-bg);
+        border-radius: 6px;
+    }
+
+    .stat .label {
+        color: var(--text-muted);
+        font-size: 0.9rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .stat .value {
+        color: var(--text-light);
+        font-size: 1.5rem;
+        font-weight: bold;
+    }
+
+    .attendance-lists {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 2rem;
+    }
+
+    .attended-section,
+    .absent-section {
+        background: var(--card-bg);
+        border-radius: 8px;
+        padding: 1.5rem;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .user-list {
+        margin-top: 1rem;
+    }
+
+    .user-card {
+        background: var(--darker-bg);
+        border-radius: 6px;
+        padding: 1rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .user-info {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+
+    .user-name {
+        color: var(--text-light);
+        font-weight: 500;
+    }
+
+    .check-in-time {
+        color: var(--text-muted);
+        font-size: 0.9rem;
+    }
+
+    .no-data {
+        color: var(--text-muted);
+        text-align: center;
+        padding: 1rem;
+    }
+
+    @media (max-width: 768px) {
+        .event-attendance {
+            padding: 1rem;
+        }
+
+        .attendance-lists {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+{% endblock %} 

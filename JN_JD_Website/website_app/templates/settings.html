@@ -1,0 +1,151 @@
+{% extends 'index.html' %}
+{% load static %}
+
+{% block content %}
+<div class="content">
+    <h1>Settings</h1>
+    <div class="settings-container">
+        <div class="settings-section">
+            <h2>Account Settings</h2>
+            <form class="settings-form">
+                <div class="form-group">
+                    <label for="email">Email Notifications</label>
+                    <div class="toggle-switch">
+                        <input type="checkbox" id="email" checked>
+                        <label for="email"></label>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="push">Push Notifications</label>
+                    <div class="toggle-switch">
+                        <input type="checkbox" id="push" checked>
+                        <label for="push"></label>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="theme">Dark Mode</label>
+                    <div class="toggle-switch">
+                        <input type="checkbox" id="theme">
+                        <label for="theme"></label>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <div class="settings-section">
+            <h2>Privacy Settings</h2>
+            <form class="settings-form">
+                <div class="form-group">
+                    <label for="profile">Profile Visibility</label>
+                    <select id="profile" class="settings-select">
+                        <option value="public">Public</option>
+                        <option value="private">Private</option>
+                        <option value="connections">Connections Only</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="location">Location Sharing</label>
+                    <select id="location" class="settings-select">
+                        <option value="enabled">Enabled</option>
+                        <option value="disabled">Disabled</option>
+                    </select>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+.settings-container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+.settings-section {
+    background-color: var(--white);
+    border-radius: 12px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 2px 8px var(--shadow);
+}
+
+.settings-section h2 {
+    color: var(--rich-black);
+    margin-bottom: 1.5rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid var(--medium-blue-slate);
+}
+
+.settings-form {
+    display: grid;
+    gap: 1.5rem;
+}
+
+.form-group {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.form-group label {
+    color: var(--rich-black);
+    font-weight: 500;
+}
+
+.settings-select {
+    padding: 0.5rem;
+    border: 1px solid var(--periwinkle);
+    border-radius: 6px;
+    background-color: var(--white);
+    color: var(--rich-black);
+    min-width: 200px;
+}
+
+/* Toggle Switch Styles */
+.toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 60px;
+    height: 34px;
+}
+
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-switch label {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    transition: .4s;
+    border-radius: 34px;
+}
+
+.toggle-switch label:before {
+    position: absolute;
+    content: "";
+    height: 26px;
+    width: 26px;
+    left: 4px;
+    bottom: 4px;
+    background-color: white;
+    transition: .4s;
+    border-radius: 50%;
+}
+
+.toggle-switch input:checked + label {
+    background-color: var(--medium-blue-slate);
+}
+
+.toggle-switch input:checked + label:before {
+    transform: translateX(26px);
+}
+</style>
+{% endblock %} 

@@ -7,6 +7,8 @@ import string
 class User(AbstractUser):
     f_name = models.CharField(max_length=255)
     l_name = models.CharField(max_length=255)
+    latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
 
     groups = models.ManyToManyField(
         "auth.Group",
@@ -48,7 +50,7 @@ class Organization(models.Model):
 
 class Role(models.Model):
     name = models.CharField(max_length=255)  # Role name (e.g., Admin, Manager, Member)
-    permissions = models.CharField(max_length=255, blank=True, null=True)  # Store specific permissions
+    permissions = models.CharField(max_length=255, blank=True)  # Store specific permissions
 
     class Meta:
         db_table = 'Role'
@@ -60,9 +62,13 @@ class Event(models.Model):
     name = models.CharField(max_length=255)
     description = models.TextField()
     date = models.DateField()
-    location = models.CharField(max_length=255, null=True, blank=True)
+    location = models.CharField(max_length=255, blank=True)
     organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='events')
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='owned_events')
+    # Geofence fields
+    geofence_latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    geofence_longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    geofence_radius = models.PositiveIntegerField(null=True, blank=True, help_text="Radius in meters")
 
     def get_attending_groups(self):
         return self.groups.all()
@@ -111,3 +117,33 @@ class UserEvents(models.Model):
 class UserOrganization(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, db_column='User_ID', related_name='user_organizations')
     organization = models.ForeignKey(Organization, on_delete=models.CASCADE, db_column='Organization_ID', related_name='user_organizations')
+
+class Geofence(models.Model):
+    name = models.CharField(max_length=255)
+    latitude = models.DecimalField(max_digits=9, decimal_places=6)
+    longitude = models.DecimalField(max_digits=9, decimal_places=6)
+    radius = models.PositiveIntegerField(help_text="Radius in meters")
+    event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='geofences')
+    date_created = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='created_geofences')
+
+    class Meta:
+        db_table = 'Geofence'
+        
+    def __str__(self):
+        return f"{self.name} - {self.event.name}"
+
+class EventCheckIn(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='event_checkins')
+    event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='checkins')
+    check_in_time = models.DateTimeField(auto_now_add=True)
+    latitude = models.DecimalField(max_digits=9, decimal_places=6)
+    longitude = models.DecimalField(max_digits=9, decimal_places=6)
+    is_within_radius = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = 'EventCheckIn'
+        unique_together = (('user', 'event'),)
+
+    def __str__(self):
+        return f"{self.user.username} - {self.event.name} - {self.check_in_time}"

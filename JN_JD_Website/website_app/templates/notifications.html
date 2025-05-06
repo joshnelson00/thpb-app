@@ -1,0 +1,114 @@
+{% extends 'index.html' %}
+{% load static %}
+
+{% block content %}
+<div class="content">
+    <h1>Notifications</h1>
+    <div class="notifications-container">
+        <div class="notifications-header">
+            <h2>Recent Notifications</h2>
+            <button class="mark-all-read">Mark All as Read</button>
+        </div>
+        <div class="notifications-list">
+            <!-- Placeholder for notifications -->
+            <div class="notification-item unread">
+                <div class="notification-icon">
+                    <i class="fas fa-calendar-check"></i>
+                </div>
+                <div class="notification-content">
+                    <p class="notification-text">You have an upcoming event: <strong>Team Meeting</strong></p>
+                    <p class="notification-time">2 hours ago</p>
+                </div>
+            </div>
+            <div class="notification-item">
+                <div class="notification-icon">
+                    <i class="fas fa-user-plus"></i>
+                </div>
+                <div class="notification-content">
+                    <p class="notification-text">John Doe joined your organization</p>
+                    <p class="notification-time">1 day ago</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.notifications-container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+.notifications-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+}
+
+.mark-all-read {
+    background-color: var(--medium-blue-slate);
+    color: var(--white);
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+.mark-all-read:hover {
+    background-color: var(--periwinkle);
+}
+
+.notifications-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.notification-item {
+    display: flex;
+    gap: 1rem;
+    padding: 1rem;
+    background-color: var(--white);
+    border-radius: 8px;
+    box-shadow: 0 2px 4px var(--shadow);
+    transition: transform 0.2s ease;
+}
+
+.notification-item:hover {
+    transform: translateX(5px);
+}
+
+.notification-item.unread {
+    border-left: 4px solid var(--medium-blue-slate);
+}
+
+.notification-icon {
+    width: 40px;
+    height: 40px;
+    background-color: var(--columbia-blue);
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: var(--medium-blue-slate);
+}
+
+.notification-content {
+    flex: 1;
+}
+
+.notification-text {
+    margin: 0;
+    color: var(--rich-black);
+}
+
+.notification-time {
+    margin: 0.25rem 0 0;
+    font-size: 0.9rem;
+    color: #666;
+}
+</style>
+{% endblock %} 

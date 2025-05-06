@@ -120,6 +120,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Add event listeners for both available and assigned groups (dropzones)
     [availableGroups, assignedGroups].forEach(dropzone => {
+        if (!dropzone) return;
         dropzone.addEventListener("dragover", (event) => {
             event.preventDefault();
             const afterElement = getDragAfterElement(dropzone, event.clientY);

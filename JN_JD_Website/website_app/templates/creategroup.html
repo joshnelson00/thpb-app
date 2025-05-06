@@ -3,13 +3,211 @@
 
 {% block content %}
 <div class="content">
-    <h1>Create Group</h1>
-    <form method="post" class="form">
-        {% csrf_token %}
-        {{ form.name }}
-        {{ form.organization }}
-        <button type="submit">Submit</button>
-    </form>
-    
+    <div class="create-group-container">
+        <div class="create-group-header">
+            <h1><i class="fas fa-users"></i> Create New Group</h1>
+            <p class="create-group-description">Create a new group within your organization to better manage members and events.</p>
+        </div>
+
+        <form method="post" class="form create-group-form">
+            {% csrf_token %}
+            <div class="form-group">
+                <label for="{{ form.name.id_for_label }}">
+                    <i class="fas fa-tag"></i> Group Name
+                </label>
+                {{ form.name }}
+                {% if form.name.help_text %}
+                    <small class="form-help-text">{{ form.name.help_text }}</small>
+                {% endif %}
+                {% if form.name.errors %}
+                    <div class="form-error">{{ form.name.errors }}</div>
+                {% endif %}
+            </div>
+
+            <div class="form-group">
+                <label for="{{ form.organization.id_for_label }}">
+                    <i class="fas fa-building"></i> Organization
+                </label>
+                {{ form.organization }}
+                {% if form.organization.help_text %}
+                    <small class="form-help-text">{{ form.organization.help_text }}</small>
+                {% endif %}
+                {% if form.organization.errors %}
+                    <div class="form-error">{{ form.organization.errors }}</div>
+                {% endif %}
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="submit-button">
+                    <i class="fas fa-plus"></i> Create Group
+                </button>
+                <a href="{% url 'vieworgs' %}" class="cancel-button">
+                    <i class="fas fa-times"></i> Cancel
+                </a>
+            </div>
+        </form>
+    </div>
 </div>
+
+<style>
+    .create-group-container {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 2rem;
+    }
+
+    .create-group-header {
+        text-align: center;
+        margin-bottom: 2.5rem;
+    }
+
+    .create-group-header h1 {
+        color: var(--text-light);
+        font-size: 2.2rem;
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.75rem;
+    }
+
+    .create-group-header h1 i {
+        color: var(--periwinkle);
+    }
+
+    .create-group-description {
+        color: var(--text-muted);
+        font-size: 1.1rem;
+        line-height: 1.5;
+    }
+
+    .create-group-form {
+        background: linear-gradient(to bottom, var(--card-bg) 0%, var(--dark-bg) 100%);
+        padding: 2.5rem;
+        border-radius: 15px;
+        border: 1px solid var(--medium-blue-slate);
+    }
+
+    .form-group {
+        margin-bottom: 1.75rem;
+    }
+
+    .form-group label {
+        display: block;
+        color: var(--text-light);
+        font-size: 1.1rem;
+        margin-bottom: 0.75rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .form-group label i {
+        color: var(--periwinkle);
+    }
+
+    .form-group input,
+    .form-group select {
+        width: 100%;
+        padding: 0.875rem 1rem;
+        background-color: var(--darker-bg);
+        border: 1px solid var(--medium-blue-slate);
+        border-radius: 8px;
+        color: var(--text-light);
+        font-size: 1rem;
+        transition: all 0.3s ease;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus {
+        outline: none;
+        border-color: var(--periwinkle);
+        box-shadow: 0 0 0 2px var(--medium-blue-slate);
+    }
+
+    .form-help-text {
+        display: block;
+        color: var(--text-muted);
+        font-size: 0.9rem;
+        margin-top: 0.5rem;
+    }
+
+    .form-error {
+        color: #ff6b6b;
+        font-size: 0.9rem;
+        margin-top: 0.5rem;
+    }
+
+    .form-actions {
+        display: flex;
+        gap: 1rem;
+        margin-top: 2rem;
+    }
+
+    .submit-button,
+    .cancel-button {
+        flex: 1;
+        padding: 1rem;
+        border-radius: 8px;
+        font-size: 1.1rem;
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        transition: all 0.3s ease;
+        text-decoration: none;
+    }
+
+    .submit-button {
+        background: linear-gradient(to right, var(--medium-blue-slate) 0%, var(--periwinkle) 100%);
+        color: var(--white);
+        border: none;
+        cursor: pointer;
+    }
+
+    .submit-button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+
+    .cancel-button {
+        background: transparent;
+        color: var(--text-muted);
+        border: 1px solid var(--text-muted);
+    }
+
+    .cancel-button:hover {
+        background-color: rgba(160, 160, 160, 0.1);
+        color: var(--text-light);
+        border-color: var(--text-light);
+    }
+
+    @media (max-width: 768px) {
+        .create-group-container {
+            padding: 1rem;
+        }
+
+        .create-group-header h1 {
+            font-size: 1.8rem;
+        }
+
+        .create-group-description {
+            font-size: 1rem;
+        }
+
+        .create-group-form {
+            padding: 1.5rem;
+        }
+
+        .form-actions {
+            flex-direction: column;
+        }
+
+        .submit-button,
+        .cancel-button {
+            width: 100%;
+        }
+    }
+</style>
 {% endblock %}

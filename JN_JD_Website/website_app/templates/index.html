@@ -3,8 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Index Page</title>
+    <title>SoundCheq - {% block title %}Home{% endblock %}</title>
     {% load static %}
+    <link rel="icon" type="image/x-icon" href="{% static 'favicon.ico' %}">
+    <link rel="shortcut icon" type="image/x-icon" href="{% static 'favicon.ico' %}">
     <link rel="stylesheet" href="{% static 'styles.css' %}?v={{ timestamp }}">
     <script src="{% static 'scripts.js' %}"></script>
 
@@ -13,48 +15,95 @@
 </head>
 <body>
     <div id="navbar">
-        <ul class="nav-links">
+        <!-- Hamburger Menu Button (Mobile Only) -->
+        <button class="hamburger-menu" onclick="toggleMobileMenu()">
+            <i class="fas fa-bars"></i>
+        </button>
+
+        <!-- Mobile Menu Overlay -->
+        <div class="mobile-menu-overlay" id="mobileMenu">
+            <div class="mobile-menu-content">
+                <button class="close-menu" onclick="toggleMobileMenu()">
+                    <i class="fas fa-times"></i>
+                </button>
+                <ul class="mobile-nav-links">
+                    <li><a href="{% url 'home' %}"><i class="fas fa-home"></i> Home</a></li>
+                    <li class="mobile-dropdown">
+                        <a href="#" onclick="toggleMobileDropdown(this)"><i class="fas fa-calendar-alt"></i> Events <i class="fas fa-chevron-down"></i></a>
+                        <ul class="mobile-dropdown-menu">
+                            <li><a href="{% url 'viewevents' %}?filter=upcoming"><i class="fas fa-clock"></i> Upcoming Events</a></li>
+                            <li><a href="{% url 'createevent' %}"><i class="fas fa-plus"></i> Create Event</a></li>
+                        </ul>
+                    </li>
+                    <li class="mobile-dropdown">
+                        <a href="#" onclick="toggleMobileDropdown(this)"><i class="fas fa-users"></i> Groups <i class="fas fa-chevron-down"></i></a>
+                        <ul class="mobile-dropdown-menu">
+                            <li><a href="{% url 'creategroup' %}"><i class="fas fa-plus"></i> Create Group</a></li>
+                            <li><a href="{% url 'vieworgs' %}?view=manage"><i class="fas fa-cog"></i> Manage Groups</a></li>
+                        </ul>
+                    </li>
+                    <li class="mobile-dropdown">
+                        <a href="#" onclick="toggleMobileDropdown(this)"><i class="fas fa-building"></i> Organizations <i class="fas fa-chevron-down"></i></a>
+                        <ul class="mobile-dropdown-menu">
+                            <li><a href="{% url 'vieworgs' %}"><i class="fas fa-list"></i> My Organizations</a></li>
+                            <li><a href="{% url 'createorg' %}"><i class="fas fa-plus"></i> Create Organization</a></li>
+                            <li><a href="{% url 'joinorg' %}"><i class="fas fa-user-plus"></i> Join Organization</a></li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Desktop Navigation -->
+        <ul class="nav-links desktop-nav">
+            <li><a href="{% url 'home' %}"><i class="fas fa-home"></i> Home</a></li>
             <li class="dropdown">
-                <a href="#">Events</a>
+                <a href="#"><i class="fas fa-calendar-alt"></i> Events</a>
                 <ul class="dropdown-menu">
-                    <li><a href="{% url 'viewevents' %}">View Events</a></li>
-                    <li><a href="{% url 'createevent' %}">Create Event</a></li>
+                    <li><a href="{% url 'viewevents' %}?filter=upcoming"><i class="fas fa-clock"></i> Upcoming Events</a></li>
+                    <li><a href="{% url 'createevent' %}"><i class="fas fa-plus"></i> Create Event</a></li>
                 </ul>
             </li>
             <li class="dropdown">
-                <a href="#">Groups</a>
+                <a href="#"><i class="fas fa-users"></i> Groups</a>
                 <ul class="dropdown-menu">
-                    <li><a href="{% url 'creategroup' %}">Create Group</a></li>
+                    <li><a href="{% url 'creategroup' %}"><i class="fas fa-plus"></i> Create Group</a></li>
+                    <li><a href="{% url 'vieworgs' %}?view=manage"><i class="fas fa-cog"></i> Manage Groups</a></li>
                 </ul>
             </li>
             <li class="dropdown">
-                <a href="#">Organizations</a>
+                <a href="#"><i class="fas fa-building"></i> Organizations</a>
                 <ul class="dropdown-menu">
-                    <li><a href="{% url 'vieworgs' %}">View Organizations</a></li>
-                    <li><a href="{% url 'createorg' %}">Create Organization</a></li>
-                    <li><a href="{% url 'joinorg' %}">Join Organization</a></li>
+                    <li><a href="{% url 'vieworgs' %}"><i class="fas fa-list"></i> My Organizations</a></li>
+                    <li><a href="{% url 'createorg' %}"><i class="fas fa-plus"></i> Create Organization</a></li>
+                    <li><a href="{% url 'joinorg' %}"><i class="fas fa-user-plus"></i> Join Organization</a></li>
                 </ul>
             </li>
-            <li>
-                <form action="{% url 'logout' %}" method="post">
-                    {% csrf_token %}
-                    <button type="submit">Logout</button>
-                </form>
-            </li>
-            
         </ul>
+
         <!-- Profile Picture with Username Initial -->
-        <div id="profile-picture"><a href="#">{{ request.user.f_name|slice:":1"|upper }}</a></div>
+        <div id="profile-picture">
+            <a href="#">{{ request.user.f_name|slice:":1"|upper }}</a>
+            <div class="profile-dropdown">
+                <ul>
+                    <li><a href="{% url 'account_details' %}"><i class="fas fa-user"></i> Account Details</a></li>
+                    <li><a href="{% url 'notifications' %}"><i class="fas fa-bell"></i> Notifications</a></li>
+                    <li><a href="{% url 'settings' %}"><i class="fas fa-cog"></i> Settings</a></li>
+                    <li><a href="{% url 'help' %}"><i class="fas fa-question-circle"></i> Help & Support</a></li>
+                    <li>
+                        <form action="{% url 'logout' %}" method="post">
+                            {% csrf_token %}
+                            <button type="submit"><i class="fas fa-sign-out-alt"></i> Logout</button>
+                        </form>
+                    </li>
+                </ul>
+            </div>
+        </div>
     </div>
-    <div class="mobile-ad-container">
-        <div class="mobile-ad-box">Mobile Ad</div>
-    </div>
-    <div class="ad-container">
-        <div class="ad-box">Left Ad</div>
-            {% block content %}
-            {% endblock %}
-        <div class="ad-box">Right Ad</div>
-    </div>
+
+    <!-- Main Content -->
+    {% block content %}
+    {% endblock %}
 
     <footer>
         <div class="footer-content">
@@ -90,5 +139,161 @@
             <p>&copy; 2025 SoundCheq L.L.C. All rights reserved.</p>
         </div>
     </footer>
+
+    <script>
+        function toggleMobileMenu() {
+            const menu = document.getElementById('mobileMenu');
+            menu.classList.toggle('active');
+            document.body.classList.toggle('menu-open');
+        }
+
+        function toggleMobileDropdown(element) {
+            const dropdown = element.nextElementSibling;
+            dropdown.classList.toggle('active');
+            element.classList.toggle('active');
+        }
+
+        // Close mobile menu when clicking outside
+        document.addEventListener('click', function(event) {
+            const menu = document.getElementById('mobileMenu');
+            const hamburger = document.querySelector('.hamburger-menu');
+            if (!menu.contains(event.target) && !hamburger.contains(event.target)) {
+                menu.classList.remove('active');
+                document.body.classList.remove('menu-open');
+            }
+        });
+    </script>
+
+    <style>
+        /* Mobile Menu Styles */
+        .hamburger-menu {
+            display: none;
+            background: none;
+            border: none;
+            color: var(--medium-blue-slate);
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 0.5rem;
+            z-index: 1001;
+        }
+
+        .mobile-menu-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(12, 12, 22, 0.95);
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .mobile-menu-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .mobile-menu-content {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            padding: 4rem 2rem 2rem;
+            overflow-y: auto;
+        }
+
+        .close-menu {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: none;
+            border: none;
+            color: var(--text-light);
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 0.5rem;
+        }
+
+        .mobile-nav-links {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .mobile-nav-links li {
+            margin-bottom: 1rem;
+        }
+
+        .mobile-nav-links a {
+            color: var(--text-light);
+            text-decoration: none;
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .mobile-nav-links a:hover {
+            background: var(--medium-blue-slate);
+            color: var(--white);
+        }
+
+        .mobile-dropdown-menu {
+            display: none;
+            list-style: none;
+            padding-left: 2rem;
+            margin-top: 0.5rem;
+        }
+
+        .mobile-dropdown-menu.active {
+            display: block;
+        }
+
+        .mobile-dropdown-menu a {
+            font-size: 1.1rem;
+            padding: 0.5rem 0.75rem;
+        }
+
+        .mobile-dropdown > a i.fa-chevron-down {
+            margin-left: auto;
+            transition: transform 0.3s ease;
+        }
+
+        .mobile-dropdown > a.active i.fa-chevron-down {
+            transform: rotate(180deg);
+        }
+
+        /* Responsive Styles */
+        @media (max-width: 768px) {
+            .hamburger-menu {
+                display: block;
+            }
+
+            .desktop-nav {
+                display: none;
+            }
+
+            #profile-picture {
+                margin-left: 0;
+                width: 2.5rem;
+                height: 2.5rem;
+                font-size: 1.2rem;
+            }
+
+            .profile-dropdown {
+                right: 0;
+                width: 200px;
+            }
+
+            body.menu-open {
+                overflow: hidden;
+            }
+        }
+    </style>
 </body>
 </html>

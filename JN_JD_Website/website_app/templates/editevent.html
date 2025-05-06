@@ -2,42 +2,527 @@
 {% load static %}
 
 {% block content %}
-<div class="content">
-    <h1>Edit Event: {{ event.name }}</h1>
-    <div class="event-details-container">
-        <div class="event-date-block">
-            {{ event.date.day }} <!-- Day of the event -->
-            <div class="event-date-text">{{ event.date|date:"b" }}</div> <!-- Month abbreviation -->
-        </div>
-        <div class="event-description-container">
-            {{ event.description }}
-        </div>
+<div class="home-container">
+    <div class="welcome-section">
+        <h1><i class="fas fa-edit"></i> Edit Event: {{ event.name }}</h1>
+        <p class="welcome-message">Modify event details and manage assigned groups.</p>
     </div>
-    <div class="movable-group-container">
-        <div class="movable-group-container-wrapper">
-            <h2>Available Groups</h2>
-            <div class="movable-groups" id="available-groups">
-                <div class="movable-group" id="group1">Group A</div>
-                <div class="movable-group" id="group2">Group B</div>
-                <div class="movable-group" id="group3">Group C</div>
+
+    <div class="dashboard-grid">
+        <!-- Event Details Card -->
+        <div class="dashboard-card">
+            <div class="card-header">
+                <h2><i class="fas fa-info-circle"></i> Event Details</h2>
+            </div>
+            <div class="card-content">
+                <div class="event-item">
+                    <div class="event-date">
+                        <span class="day">{{ event.date.day }}</span>
+                        <span class="month">{{ event.date|date:"M" }}</span>
+                    </div>
+                    <div class="event-details">
+                        <h3>{{ event.name }}</h3>
+                        <div class="event-attribute">
+                            <div class="event-attribute-label">
+                                <i class="fas fa-calendar"></i>
+                                Date:
+                            </div>
+                            <span class="event-attribute-value">
+                                {{ event.date|date:"F j, Y" }}
+                            </span>
+                        </div>
+                        <div class="event-attribute">
+                            <div class="event-attribute-label">
+                                <i class="fas fa-map-marker-alt"></i>
+                                Location:
+                            </div>
+                            <span class="event-attribute-value">
+                                {{ event.location }}
+                            </span>
+                        </div>
+                        <div class="event-description">
+                            <div class="event-description-label">
+                                <i class="fas fa-align-left"></i>
+                                Description:
+                            </div>
+                            <div class="event-description-content">{{ event.description }}</div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
-    
-        <div class="movable-group-container-wrapper">
-            <h2>Assigned Groups</h2>
-            <div class="movable-groups" id="assigned-groups">
-                <div class="movable-group" id="group4">Group D</div>
-                <div class="movable-group" id="group5">Group E</div>
-                <div class="movable-group" id="group6">Group F</div>
-                <div class="movable-group" id="group7">Group G</div>
-                <div class="movable-group" id="group8">Group H</div>
-                <div class="movable-group" id="group9">Group I</div>
-                <div class="movable-group" id="group10">Group J</div>
-                <div class="movable-group" id="group11">Group K</div>
+
+        <!-- Groups Management Card -->
+        <div class="dashboard-card">
+            <div class="card-header">
+                <h2><i class="fas fa-users"></i> Manage Groups</h2>
+            </div>
+            <div class="card-content">
+                <div class="groups-management">
+                    <div class="groups-column">
+                        <h3>Available Groups</h3>
+                        <div class="movable-groups" id="available-groups">
+                            {% for group in available_groups %}
+                            <div class="movable-group" id="group{{ group.id }}" draggable="true">
+                                <i class="fas fa-user-friends"></i>
+                                {{ group.name }}
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                
+                    <div class="groups-column">
+                        <h3>Assigned Groups</h3>
+                        <div class="movable-groups" id="assigned-groups">
+                            {% for group in assigned_groups %}
+                                {% if group.name %}
+                                    <div class="movable-group" id="group{{ group.id }}" draggable="true">
+                                        <i class="fas fa-user-friends"></i>
+                                        {{ group.name }}
+                                    </div>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Delete Event Card -->
+        <div class="dashboard-card">
+            <div class="card-header">
+                <h2><i class="fas fa-trash-alt"></i> Danger Zone</h2>
+            </div>
+            <div class="card-content">
+                <div class="delete-section">
+                    <p>Once you delete an event, there is no going back. Please be certain.</p>
+                    <button id="deleteEvent" class="action-btn delete">
+                        <i class="fas fa-trash-alt"></i>
+                        Delete Event
+                    </button>
+                </div>
             </div>
         </div>
     </div>
-    
-    
 </div>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+    $(document).ready(function() {
+        // Delete event functionality
+        $('#deleteEvent').on('click', function() {
+            if (confirm('Are you sure you want to delete this event? This action cannot be undone.')) {
+                $.ajax({
+                    url: "{% url 'delete_event' event.id %}",
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': '{{ csrf_token }}'
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            window.location.href = "{% url 'viewevents' %}";
+                        } else {
+                            alert('Error deleting event: ' + response.error);
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        alert('Error deleting event. Please try again.');
+                    }
+                });
+            }
+        });
+
+        // Make all groups draggable
+        $(".movable-group").attr("draggable", true);
+
+        // Handle drag start
+        $(".movable-group").on("dragstart", function(event) {
+            event.originalEvent.dataTransfer.setData("group_id", $(this).attr("id").replace("group", ""));
+        });
+
+        // Handle drag over for both containers
+        $(".movable-groups").on("dragover", function(event) {
+            event.preventDefault();
+        });
+
+        // Handle drop on available groups
+        $("#available-groups").on("drop", function(event) {
+            event.preventDefault();
+            let group_id = event.originalEvent.dataTransfer.getData("group_id");
+            
+            $.ajax({
+                url: "{% url 'update_event_group' %}",
+                method: "POST",
+                contentType: "application/json",
+                data: JSON.stringify({
+                    group_id: group_id,
+                    event_id: "{{ event.id }}",
+                    action: "remove"
+                }),
+                headers: {
+                    "X-CSRFToken": "{{ csrf_token }}"
+                },
+                success: function(response) {
+                    if (response.success) {
+                        $("#group" + group_id).appendTo("#available-groups");
+                    } else {
+                        console.error("Error:", response.error);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error("AJAX Error:", status, error);
+                }
+            });
+        });
+
+        // Handle drop on assigned groups
+        $("#assigned-groups").on("drop", function(event) {
+            event.preventDefault();
+            let group_id = event.originalEvent.dataTransfer.getData("group_id");
+            
+            $.ajax({
+                url: "{% url 'update_event_group' %}",
+                method: "POST",
+                contentType: "application/json",
+                data: JSON.stringify({
+                    group_id: group_id,
+                    event_id: "{{ event.id }}",
+                    action: "add"
+                }),
+                headers: {
+                    "X-CSRFToken": "{{ csrf_token }}"
+                },
+                success: function(response) {
+                    if (response.success) {
+                        $("#group" + group_id).appendTo("#assigned-groups");
+                    } else {
+                        console.error("Error:", response.error);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error("AJAX Error:", status, error);
+                }
+            });
+        });
+
+        // Handle double-click to remove group from event
+        $("#assigned-groups").on("dblclick", ".movable-group", function() {
+            let group_id = $(this).attr("id").replace("group", "");
+            let $groupElement = $(this);
+
+            $.ajax({
+                url: "{% url 'update_event_group' %}",
+                method: "POST",
+                contentType: "application/json",
+                data: JSON.stringify({
+                    group_id: group_id,
+                    event_id: "{{ event.id }}",
+                    action: "remove"
+                }),
+                headers: {
+                    "X-CSRFToken": "{{ csrf_token }}"
+                },
+                success: function(response) {
+                    if (response.success) {
+                        $groupElement.appendTo("#available-groups");
+                    } else {
+                        console.error("Error:", response.error);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error("AJAX Error:", status, error);
+                }
+            });
+        });
+    });
+</script>
+
+<style>
+    .home-container {
+        max-width: 1080px;
+        margin: 2rem auto;
+        padding: 0 2rem;
+        width: 72%;
+    }
+
+    .welcome-section {
+        text-align: center;
+        margin-bottom: 2rem;
+        padding-bottom: 1.5rem;
+        border-bottom: 1px solid var(--medium-blue-slate);
+    }
+
+    .welcome-section h1 {
+        color: var(--text-light);
+        font-size: 2.5rem;
+        margin-bottom: 0.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.75rem;
+    }
+
+    .welcome-message {
+        color: var(--text-muted);
+        font-size: 1.1rem;
+    }
+
+    .dashboard-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 2rem;
+        width: 100%;
+        margin: 0 auto;
+    }
+
+    .dashboard-card {
+        background: linear-gradient(to bottom, var(--card-bg) 0%, var(--dark-bg) 100%);
+        border-radius: 16px;
+        padding: 2rem;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+        border: 1px solid var(--medium-blue-slate);
+    }
+
+    .card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid var(--medium-blue-slate);
+    }
+
+    .card-header h2 {
+        color: var(--text-light);
+        font-size: 1.5rem;
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .card-header h2 i {
+        color: var(--periwinkle);
+    }
+
+    .groups-management {
+        display: flex;
+        gap: 2rem;
+        margin-top: 1rem;
+    }
+
+    .groups-column {
+        flex: 1;
+    }
+
+    .groups-column h3 {
+        color: var(--text-light);
+        margin-bottom: 1rem;
+        font-size: 1.2rem;
+    }
+
+    .movable-groups {
+        background: var(--darker-bg);
+        border-radius: 12px;
+        padding: 1rem;
+        min-height: 200px;
+        border: 1px solid var(--medium-blue-slate);
+    }
+
+    .movable-group {
+        background: var(--medium-blue-slate);
+        color: var(--white);
+        padding: 0.75rem 1rem;
+        margin: 0.5rem 0;
+        border-radius: 8px;
+        cursor: grab;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        transition: all 0.3s ease;
+    }
+
+    .movable-group:hover {
+        background: var(--periwinkle);
+        transform: translateY(-2px);
+    }
+
+    .movable-group i {
+        font-size: 1rem;
+    }
+
+    .delete-section {
+        text-align: center;
+        padding: 1rem;
+        background: var(--darker-bg);
+        border-radius: 12px;
+        border: 1px solid var(--medium-blue-slate);
+    }
+
+    .delete-section p {
+        color: var(--text-muted);
+        margin-bottom: 1.5rem;
+    }
+
+    .action-btn.delete {
+        background: #dc3545;
+        color: var(--white);
+        padding: 0.75rem 1.5rem;
+        border-radius: 25px;
+        border: none;
+        cursor: pointer;
+        font-size: 1rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.75rem;
+        transition: all 0.3s ease;
+    }
+
+    .action-btn.delete:hover {
+        background: #c82333;
+        transform: translateY(-2px);
+    }
+
+    .event-item {
+        display: flex;
+        gap: 2rem;
+        align-items: flex-start;
+        padding: 1.5rem;
+        background: var(--darker-bg);
+        border-radius: 12px;
+        border: 1px solid var(--medium-blue-slate);
+    }
+
+    .event-date {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: var(--medium-blue-slate);
+        width: 120px;
+        height: 120px;
+        border-radius: 12px;
+        flex-shrink: 0;
+    }
+
+    .event-date .day {
+        font-size: 3rem;
+        font-weight: bold;
+        color: var(--white);
+        line-height: 1;
+    }
+
+    .event-date .month {
+        font-size: 1.2rem;
+        color: var(--white);
+        text-transform: uppercase;
+        margin-top: 0.5rem;
+    }
+
+    .event-details {
+        flex: 1;
+        max-width: 600px;
+    }
+
+    .event-details h3 {
+        color: var(--text-light);
+        font-size: 1.8rem;
+        margin: 0 0 1.5rem 0;
+        border-bottom: 2px solid var(--medium-blue-slate);
+        padding-bottom: 0.5rem;
+    }
+
+    .event-attribute {
+        display: flex;
+        margin: 1rem 0;
+        color: var(--text-muted);
+    }
+
+    .event-attribute-label {
+        min-width: 120px;
+        font-weight: 500;
+        color: var(--text-light);
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .event-attribute-label i {
+        color: var(--periwinkle);
+        width: 16px;
+    }
+
+    .event-attribute-value {
+        flex: 1;
+        color: var(--text-muted);
+    }
+
+    .event-description {
+        margin-top: 1.5rem;
+        padding-top: 1.5rem;
+        border-top: 1px solid var(--medium-blue-slate);
+    }
+
+    .event-description-label {
+        color: var(--text-light);
+        font-weight: 500;
+        margin-bottom: 0.75rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .event-description-label i {
+        color: var(--periwinkle);
+        width: 16px;
+    }
+
+    .event-description-content {
+        color: var(--text-muted);
+        line-height: 1.6;
+    }
+
+    @media (max-width: 768px) {
+        .home-container {
+            padding: 0 1rem;
+            margin: 1rem auto;
+            width: 85%;
+        }
+
+        .event-item {
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            gap: 1.5rem;
+        }
+
+        .event-date {
+            width: 100px;
+            height: 100px;
+        }
+
+        .event-details {
+            width: 100%;
+        }
+
+        .event-attribute {
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .event-attribute-label {
+            min-width: auto;
+            justify-content: center;
+        }
+
+        .event-attribute-value {
+            justify-content: center;
+        }
+
+        .event-description-label {
+            justify-content: center;
+        }
+    }
+</style>
 {% endblock %}

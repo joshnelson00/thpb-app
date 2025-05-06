@@ -3,35 +3,238 @@
 
 {% block content %}
 <div class="content">
-    <h1>Your Organizations</h1>
-    
-    {% if owned_organizations %}
-        <h2>Organizations You Own</h2>
-        <ul class="organization-list">
-            {% for org in owned_organizations %}
-                <li>
-                    <h3>{{ org.name }}</h3>
-                    <!-- Only show the "View Groups" link if the user is the owner of the group -->
-                    <a href="{% url 'editgroups' org.id %}">View Groups</a>
-                </li>
-            {% endfor %}
-        </ul>
-    {% else %}
-        <p>You don't own any organizations yet.</p>
-    {% endif %}
-    
-    {% if member_organizations %}
-        <h2>Organizations You Are a Member Of</h2>
-        <ul class="organization-list">
-            {% for org in member_organizations %}
-                <li>
-                    <h3>{{ org.name }}</h3>
-                    <!-- Hide the link to view groups here since user isn't the owner -->
-                </li>
-            {% endfor %}
-        </ul>
-    {% else %}
-        <p>You are not a member of any organizations yet.</p>
-    {% endif %}
+    <div class="organizations-container">
+        <h1>Your Organizations</h1>
+        
+        {% if owned_organizations %}
+            <div class="org-section">
+                <h2><i class="fas fa-crown"></i> Organizations You Own</h2>
+                <div class="org-grid">
+                    {% for org in owned_organizations %}
+                        <div class="org-card">
+                            <div class="org-card-header">
+                                <h3>{{ org.name }}</h3>
+                                <span class="org-badge owner">Owner</span>
+                            </div>
+                            <div class="org-card-content">
+                                <p class="org-description">Manage your organization's groups and members</p>
+                                <div class="org-actions">
+                                    <a href="{% url 'editgroups' org.id %}" class="org-button">
+                                        <i class="fas fa-users"></i> Manage Groups
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        {% else %}
+            <div class="empty-state">
+                <i class="fas fa-building"></i>
+                <p>You don't own any organizations yet.</p>
+                <a href="{% url 'createorg' %}" class="create-button">
+                    <i class="fas fa-plus"></i> Create Organization
+                </a>
+            </div>
+        {% endif %}
+        
+        {% if member_organizations %}
+            <div class="org-section">
+                <h2><i class="fas fa-users"></i> Organizations You Are a Member Of</h2>
+                <div class="org-grid">
+                    {% for org in member_organizations %}
+                        <div class="org-card">
+                            <div class="org-card-header">
+                                <h3>{{ org.name }}</h3>
+                                <span class="org-badge member">Member</span>
+                            </div>
+                            <div class="org-card-content">
+                                <p class="org-description">You are a member of this organization</p>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        {% else %}
+            <div class="empty-state">
+                <i class="fas fa-user-friends"></i>
+                <p>You are not a member of any organizations yet.</p>
+                <a href="{% url 'joinorg' %}" class="create-button">
+                    <i class="fas fa-sign-in-alt"></i> Join Organization
+                </a>
+            </div>
+        {% endif %}
+    </div>
 </div>
+
+<style>
+    .organizations-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 1rem;
+    }
+
+    .organizations-container h1 {
+        text-align: center;
+        color: var(--text-light);
+        margin-bottom: 2rem;
+        font-size: 2rem;
+    }
+
+    .org-section {
+        margin-bottom: 3rem;
+    }
+
+    .org-section h2 {
+        color: var(--text-light);
+        font-size: 1.5rem;
+        margin-bottom: 1.5rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .org-section h2 i {
+        color: var(--periwinkle);
+    }
+
+    .org-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 1.5rem;
+    }
+
+    .org-card {
+        background: linear-gradient(to bottom, var(--card-bg) 0%, var(--dark-bg) 100%);
+        border-radius: 12px;
+        border: 1px solid var(--medium-blue-slate);
+        overflow: hidden;
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .org-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+    }
+
+    .org-card-header {
+        padding: 1.25rem;
+        background: linear-gradient(to right, var(--medium-blue-slate) 0%, var(--periwinkle) 100%);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .org-card-header h3 {
+        color: var(--white);
+        margin: 0;
+        font-size: 1.25rem;
+    }
+
+    .org-badge {
+        padding: 0.35rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 500;
+    }
+
+    .org-badge.owner {
+        background-color: var(--celadon);
+        color: var(--rich-black);
+    }
+
+    .org-badge.member {
+        background-color: var(--periwinkle);
+        color: var(--rich-black);
+    }
+
+    .org-card-content {
+        padding: 1.25rem;
+    }
+
+    .org-description {
+        color: var(--text-muted);
+        margin-bottom: 1.25rem;
+        font-size: 0.9rem;
+    }
+
+    .org-actions {
+        display: flex;
+        gap: 1rem;
+    }
+
+    .org-button {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.75rem 1.25rem;
+        background: linear-gradient(to right, var(--medium-blue-slate) 0%, var(--periwinkle) 100%);
+        color: var(--white);
+        text-decoration: none;
+        border-radius: 6px;
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .org-button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        color: var(--white);
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 3rem 1rem;
+        background: linear-gradient(to bottom, var(--card-bg) 0%, var(--dark-bg) 100%);
+        border-radius: 12px;
+        border: 1px solid var(--medium-blue-slate);
+    }
+
+    .empty-state i {
+        font-size: 3rem;
+        color: var(--periwinkle);
+        margin-bottom: 1rem;
+    }
+
+    .empty-state p {
+        color: var(--text-muted);
+        margin-bottom: 1.5rem;
+        font-size: 1.1rem;
+    }
+
+    .create-button {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.75rem 1.5rem;
+        background: linear-gradient(to right, var(--medium-blue-slate) 0%, var(--periwinkle) 100%);
+        color: var(--white);
+        text-decoration: none;
+        border-radius: 6px;
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .create-button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        color: var(--white);
+    }
+
+    @media (max-width: 768px) {
+        .org-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .organizations-container h1 {
+            font-size: 1.75rem;
+        }
+
+        .org-section h2 {
+            font-size: 1.25rem;
+        }
+
+        .org-card-header h3 {
+            font-size: 1.1rem;
+        }
+    }
+</style>
 {% endblock %}
