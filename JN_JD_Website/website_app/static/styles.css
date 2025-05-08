@@ -53,6 +53,7 @@ html {
 }
 body {
     background: linear-gradient(135deg, var(--dark-bg) 0%, var(--darker-bg) 100%);
+    background-attachment: fixed;
     width: 100%;
     padding: 0;
     margin: 0;
@@ -850,5 +851,84 @@ footer {
 .delete-event-link:hover {
     background-color: #c82333;
     color: var(--white);
+}
+
+.check-in-badge {
+    display: inline-block;
+    background: var(--celadon);
+    color: var(--rich-black);
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    margin-top: 0.5rem;
+}
+
+.check-in-badge.checked-in {
+    background: var(--periwinkle);
+}
+
+.check-in-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: #4CAF50;  /* Green color */
+    color: var(--white);
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    text-decoration: none;
+    font-size: 0.9rem;
+    margin-top: 0.5rem;
+    transition: all 0.3s ease;
+}
+
+.check-in-btn:hover {
+    background: #45a049;  /* Darker green on hover */
+    transform: translateY(-2px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.check-in-btn i {
+    font-size: 1rem;
+}
+
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.25rem;
+    border-radius: 25px;
+    font-size: 1rem;
+}
+
+.status-badge.upcoming {
+    background: var(--medium-blue-slate);
+    color: var(--white);
+}
+
+.status-badge.in-progress {
+    background: var(--celadon);
+    color: var(--rich-black);
+}
+
+.status-badge.past {
+    background: var(--text-muted);
+    color: var(--white);
+}
+
+.event-status {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-top: 1rem;
+    flex-wrap: wrap;
+}
+
+.countdown {
+    display: flex;
+    align-items: center;
+}
+
+.countdown-text {
+    font-weight: 500;
 }
 

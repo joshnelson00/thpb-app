@@ -2,11 +2,11 @@
 {% load static %}
 
 {% block content %}
-<div class="content">
+<div class="home-container">
     <div class="create-group-container">
-        <div class="create-group-header">
+        <div class="welcome-section">
             <h1><i class="fas fa-users"></i> Create New Group</h1>
-            <p class="create-group-description">Create a new group within your organization to better manage members and events.</p>
+            <p class="welcome-message">Create a new group within your organization to better manage members and events.</p>
         </div>
 
         <form method="post" class="form create-group-form">
@@ -39,53 +39,59 @@
 
             <div class="form-actions">
                 <button type="submit" class="submit-button">
-                    <i class="fas fa-plus"></i> Create Group
+                    Create Group
                 </button>
-                <a href="{% url 'vieworgs' %}" class="cancel-button">
-                    <i class="fas fa-times"></i> Cancel
-                </a>
             </div>
         </form>
     </div>
 </div>
 
 <style>
+    .home-container {
+        max-width: 2000px;
+        margin: 2rem auto;
+        padding: 0 2rem;
+        width: 95%;
+    }
+
     .create-group-container {
         max-width: 800px;
         margin: 0 auto;
-        padding: 2rem;
     }
 
-    .create-group-header {
+    .welcome-section {
         text-align: center;
-        margin-bottom: 2.5rem;
+        margin-bottom: 3rem;
+        padding-bottom: 1.5rem;
+        border-bottom: 1px solid var(--medium-blue-slate);
     }
 
-    .create-group-header h1 {
+    .welcome-section h1 {
         color: var(--text-light);
-        font-size: 2.2rem;
+        font-size: 2.5rem;
         margin-bottom: 1rem;
         display: flex;
         align-items: center;
         justify-content: center;
-        gap: 0.75rem;
+        gap: 1rem;
     }
 
-    .create-group-header h1 i {
+    .welcome-section h1 i {
         color: var(--periwinkle);
     }
 
-    .create-group-description {
+    .welcome-message {
         color: var(--text-muted);
-        font-size: 1.1rem;
-        line-height: 1.5;
+        font-size: 1.2rem;
     }
 
     .create-group-form {
-        background: linear-gradient(to bottom, var(--card-bg) 0%, var(--dark-bg) 100%);
+        background: linear-gradient(to bottom, rgba(36, 36, 68, 0.95) 0%, rgba(26, 26, 46, 0.95) 100%);
         padding: 2.5rem;
         border-radius: 15px;
         border: 1px solid var(--medium-blue-slate);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
     }
 
     .form-group {
@@ -140,59 +146,68 @@
 
     .form-actions {
         display: flex;
-        gap: 1rem;
+        justify-content: center;
         margin-top: 2rem;
     }
 
-    .submit-button,
-    .cancel-button {
-        flex: 1;
-        padding: 1rem;
+    .create-group-form .submit-button {
+        width: 150px;
+        padding: 0.75rem;
+        background: linear-gradient(to right, var(--medium-blue-slate) 0%, var(--periwinkle) 100%);
+        color: var(--white);
+        border: none;
         border-radius: 8px;
-        font-size: 1.1rem;
+        font-size: 1rem;
         font-weight: 500;
         display: flex;
         align-items: center;
         justify-content: center;
         gap: 0.5rem;
-        transition: all 0.3s ease;
-        text-decoration: none;
-    }
-
-    .submit-button {
-        background: linear-gradient(to right, var(--medium-blue-slate) 0%, var(--periwinkle) 100%);
-        color: var(--white);
-        border: none;
         cursor: pointer;
+        transition: all 0.3s ease;
+        position: relative;
+        transform: translateY(0);
     }
 
-    .submit-button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    .create-group-form .submit-button::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        border-radius: 8px;
+        padding: 2px;
+        background: linear-gradient(to right, var(--medium-blue-slate) 0%, var(--periwinkle) 100%);
+        -webkit-mask: 
+            linear-gradient(#fff 0 0) content-box, 
+            linear-gradient(#fff 0 0);
+        -webkit-mask-composite: xor;
+        mask-composite: exclude;
+        opacity: 0;
+        transition: opacity 0.3s ease;
     }
 
-    .cancel-button {
-        background: transparent;
-        color: var(--text-muted);
-        border: 1px solid var(--text-muted);
+    .create-group-form .submit-button:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
     }
 
-    .cancel-button:hover {
-        background-color: rgba(160, 160, 160, 0.1);
-        color: var(--text-light);
-        border-color: var(--text-light);
+    .create-group-form .submit-button:hover::before {
+        opacity: 1;
+    }
+
+    .create-group-form .submit-button:active {
+        transform: translateY(0);
     }
 
     @media (max-width: 768px) {
-        .create-group-container {
-            padding: 1rem;
+        .home-container {
+            padding: 0 1rem;
         }
 
-        .create-group-header h1 {
+        .welcome-section h1 {
             font-size: 1.8rem;
         }
 
-        .create-group-description {
+        .welcome-message {
             font-size: 1rem;
         }
 
@@ -202,11 +217,11 @@
 
         .form-actions {
             flex-direction: column;
+            align-items: center;
         }
 
-        .submit-button,
-        .cancel-button {
-            width: 100%;
+        .submit-button {
+            width: 150px;
         }
     }
 </style>

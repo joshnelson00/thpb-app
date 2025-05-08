@@ -2,9 +2,12 @@
 {% load static %}
 
 {% block content %}
-<div class="content">
+<div class="home-container">
     <div class="organizations-container">
-        <h1>Your Organizations</h1>
+        <div class="welcome-section">
+            <h1><i class="fas fa-building"></i> Your Organizations</h1>
+            <p class="welcome-message">Manage your organizations and their groups</p>
+        </div>
         
         {% if owned_organizations %}
             <div class="org-section">
@@ -28,12 +31,13 @@
                     {% endfor %}
                 </div>
             </div>
+            <div class="section-spacer"></div>
         {% else %}
             <div class="empty-state">
                 <i class="fas fa-building"></i>
                 <p>You don't own any organizations yet.</p>
                 <a href="{% url 'createorg' %}" class="create-button">
-                    <i class="fas fa-plus"></i> Create Organization
+                    Create Organization
                 </a>
             </div>
         {% endif %}
@@ -60,7 +64,7 @@
                 <i class="fas fa-user-friends"></i>
                 <p>You are not a member of any organizations yet.</p>
                 <a href="{% url 'joinorg' %}" class="create-button">
-                    <i class="fas fa-sign-in-alt"></i> Join Organization
+                    Join Organization
                 </a>
             </div>
         {% endif %}
@@ -68,21 +72,70 @@
 </div>
 
 <style>
+    .home-container {
+        max-width: 2000px;
+        margin: 2rem auto;
+        padding: 0 2rem;
+        width: 95%;
+    }
+
     .organizations-container {
         max-width: 1200px;
         margin: 0 auto;
-        padding: 1rem;
     }
 
-    .organizations-container h1 {
+    .welcome-section {
         text-align: center;
+        margin-bottom: 3rem;
+        padding-bottom: 1.5rem;
+        border-bottom: 1px solid var(--medium-blue-slate);
+    }
+
+    .welcome-section h1 {
         color: var(--text-light);
-        margin-bottom: 2rem;
-        font-size: 2rem;
+        font-size: 2.5rem;
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 1rem;
+    }
+
+    .welcome-section h1 i {
+        color: var(--periwinkle);
+    }
+
+    .welcome-message {
+        color: var(--text-muted);
+        font-size: 1.2rem;
     }
 
     .org-section {
+        margin-bottom: 0;
+        margin-top:2rem;
+    }
+
+    .org-section:last-child {
         margin-bottom: 3rem;
+    }
+
+    .org-section + .org-section {
+        margin-top: 8rem !important;
+        position: relative;
+    }
+
+    .org-section + .org-section::before {
+        content: '';
+        position: absolute;
+        top: -4rem;
+        left: 0;
+        right: 0;
+        height: 1px;
+        background: linear-gradient(to right,
+            rgba(102, 102, 255, 0) 0%,
+            rgba(102, 102, 255, 0.3) 50%,
+            rgba(102, 102, 255, 0) 100%
+        );
     }
 
     .org-section h2 {
@@ -105,11 +158,13 @@
     }
 
     .org-card {
-        background: linear-gradient(to bottom, var(--card-bg) 0%, var(--dark-bg) 100%);
+        background: linear-gradient(to bottom, rgba(36, 36, 68, 0.95) 0%, rgba(26, 26, 46, 0.95) 100%);
         border-radius: 12px;
         border: 1px solid var(--medium-blue-slate);
         overflow: hidden;
         transition: transform 0.3s ease, box-shadow 0.3s ease;
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
     }
 
     .org-card:hover {
@@ -184,13 +239,16 @@
     .empty-state {
         text-align: center;
         padding: 3rem 1rem;
-        background: linear-gradient(to bottom, var(--card-bg) 0%, var(--dark-bg) 100%);
+        background: linear-gradient(to bottom, rgba(36, 36, 68, 0.95) 0%, rgba(26, 26, 46, 0.95) 100%);
         border-radius: 12px;
         border: 1px solid var(--medium-blue-slate);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        margin: 1rem 0 1rem 0;
     }
 
     .empty-state i {
-        font-size: 3rem;
+        font-size: 2.5rem;
         color: var(--periwinkle);
         margin-bottom: 1rem;
     }
@@ -204,27 +262,71 @@
     .create-button {
         display: inline-flex;
         align-items: center;
+        justify-content: center;
         gap: 0.5rem;
-        padding: 0.75rem 1.5rem;
+        padding: 0.75rem 1.25rem;
         background: linear-gradient(to right, var(--medium-blue-slate) 0%, var(--periwinkle) 100%);
         color: var(--white);
         text-decoration: none;
-        border-radius: 6px;
-        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        border-radius: 8px;
+        font-size: 1rem;
+        font-weight: 500;
+        transition: all 0.3s ease;
+        position: relative;
+        transform: translateY(0);
+        height: 2.75rem;
+    }
+
+    .create-button i {
+        font-size: 1rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        height: 1rem;
+        width: 1rem;
+        position: relative;
+        top: 0.5px;
     }
 
     .create-button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        transform: translateY(-5px);
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
         color: var(--white);
     }
 
+    .create-button:active {
+        transform: translateY(0);
+    }
+
+    .section-spacer {
+        height: 2rem;
+        position: relative;
+    }
+
+    .section-spacer::after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 0;
+        right: 0;
+        height: 1px;
+        background: linear-gradient(to right,
+            rgba(102, 102, 255, 0) 0%,
+            rgba(102, 102, 255, 0.3) 50%,
+            rgba(102, 102, 255, 0) 100%
+        );
+    }
+
     @media (max-width: 768px) {
+        .home-container {
+            padding: 0 1rem;
+        }
+
         .org-grid {
             grid-template-columns: 1fr;
         }
 
-        .organizations-container h1 {
+        .welcome-section h1 {
             font-size: 1.75rem;
         }
 

@@ -9,37 +9,90 @@ from django.contrib.auth import login as auth_login
 from django.shortcuts import render, redirect, get_object_or_404
 from .forms import SignInForm, CreateAccountForm, CreateOrganizationForm, CreateGroupForm, CreateEventForm, JoinOrganizationForm, CreateGeofenceForm
 from django.views.decorators.csrf import csrf_exempt
-from .models import Organization, Event, UserGroups, EventGroups, UserOrganization, Group, User, EventCheckIn
+from .models import Organization, Event, UserGroups, EventGroups, UserOrganization, Group, User, EventCheckIn, EventAttendance
 from django.http import Http404
 from django.conf import settings
 from django.views.decorators.http import require_POST
 from django.utils import timezone
 import math
+from django.db.models import Q
+import pytz
 
 
 
 @login_required
 def home(request):
-    # Get the next 3 upcoming events for the user
+    # Get organizations owned by the user
+    owned_organizations = Organization.objects.filter(owner=request.user)
+    
+    # Get user's groups
     user_groups = UserGroups.objects.filter(user=request.user).values_list('group', flat=True)
-    upcoming_events = Event.objects.filter(
-        groups__in=user_groups,
-        date__gte=timezone.now()
-    ).order_by('date')[:3]
-
-    # Calculate time until event for each event
-    for event in upcoming_events:
-        event_datetime = timezone.make_aware(
-            timezone.datetime.combine(event.date, timezone.datetime.min.time())
-        )
-        time_until = event_datetime - timezone.now()
-        event.minutes_until = int(time_until.total_seconds() / 60)
+    
+    # Get current time in UTC
+    current_time = timezone.now()
+    
+    # Base query for events - same as view_events
+    events_query = Event.objects.filter(
+        Q(groups__group__in=user_groups) |  # Events where user's groups are attending
+        Q(organization__in=owned_organizations)  # Events from organizations user owns
+    ).distinct()
+    
+    # Get all events and filter them in Python to handle timezone conversions properly
+    all_events = events_query.order_by('date', 'time')
+    upcoming_events = []
+    
+    for event in all_events:
+        # Get the event's timezone
+        event_tz = pytz.timezone(event.timezone)
+        
+        # Create a datetime object in the event's timezone
+        event_datetime = timezone.datetime.combine(event.date, event.time)
+        event_datetime = event_tz.localize(event_datetime)
+        
+        # Get current time in the event's timezone
+        current_time_tz = current_time.astimezone(event_tz)
+        
+        # Calculate time difference
+        time_until = event_datetime - current_time_tz
+        minutes_until = int(time_until.total_seconds() / 60)
+        
+        # Only include events that haven't started yet or are within the check-in window
+        if minutes_until > -5:  # Changed from > 0 to > -5 to include events in progress
+            event.minutes_until = minutes_until
+            # Set can_check_in property - allow check-in 30 minutes before and 5 minutes after event
+            event.can_check_in = -5 <= minutes_until <= 30
+            # Set is_concluded property - event is concluded if it's more than 5 minutes past start time
+            event.is_concluded = minutes_until < -5
+            # Check if user has already checked in
+            event.user_check_in = EventCheckIn.objects.filter(
+                user=request.user,
+                event=event,
+                is_within_radius=True
+            ).exists()
+            # Get attending groups for the event
+            event.attending_groups = [event_group.group.name for event_group in event.groups.all()]
+            
+            # Calculate time display
+            if minutes_until >= 1440:  # More than 24 hours
+                days = minutes_until // 1440
+                remaining_minutes = minutes_until % 1440
+                hours = remaining_minutes // 60
+                event.time_display = f"{days}d {hours}h"
+            elif minutes_until >= 60:  # More than 1 hour
+                hours = minutes_until // 60
+                minutes = minutes_until % 60
+                event.time_display = f"{hours}h {minutes}m"
+            else:
+                event.time_display = f"{minutes_until}m"
+            
+            upcoming_events.append(event)
+            
+            # Break after getting 3 events
+            if len(upcoming_events) >= 3:
+                break
 
     # Get user's groups with their roles
     user_groups = UserGroups.objects.filter(user=request.user).select_related('group', 'group__organization')
-
-    # Get organizations owned by the user
-    owned_organizations = Organization.objects.filter(owner=request.user).prefetch_related('groups')
 
     # Get organizations where user is a member (but not owner)
     member_organizations = Organization.objects.filter(
@@ -95,7 +148,20 @@ def sign_in(request):
                     request.session.set_expiry(0)
                 return redirect('home')
             else:
-                form.add_error(None, "Invalid credentials.")
+                # Check if username exists
+                username = form.cleaned_data.get('username')
+                if User.objects.filter(username=username).exists():
+                    form.add_error(None, "Incorrect password. Please try again.")
+                else:
+                    form.add_error(None, "No account found with this username. Please check your username or create a new account.")
+        else:
+            # Handle specific form errors
+            if 'username' in form.errors:
+                form.add_error(None, "Please enter a valid username.")
+            elif 'password' in form.errors:
+                form.add_error(None, "Please enter your password.")
+            else:
+                form.add_error(None, "Please check your username and password and try again.")
     else:
         form = SignInForm()
 
@@ -352,81 +418,150 @@ def edit_event(request, event_id):
 
 @login_required
 def view_events(request):
-    # Get organizations the user owns
-    owned_organizations = Organization.objects.filter(owner=request.user)
-
-    if owned_organizations.exists():
-        events = Event.objects.filter(
-            organization__in=owned_organizations,
-            date__gte=timezone.now().date()  # Convert datetime to date for comparison
-        ).prefetch_related('groups').distinct()
-    else:
-        user_groups = UserGroups.objects.filter(user=request.user).values_list('group', flat=True)
-        events = Event.objects.filter(
-            id__in=EventGroups.objects.filter(group__in=user_groups).values_list('event', flat=True),
-            date__gte=timezone.now().date()  # Convert datetime to date for comparison
-        ).prefetch_related('groups').distinct()
-
-    organization_id = request.GET.get('organization_id')
-    group_id = request.GET.get('group_id')
-
-    if organization_id:
-        events = events.filter(organization_id=organization_id)
-    if group_id:
-        events = events.filter(groups__id=group_id).distinct()
-
-    # Sort by date ascending (earliest to latest)
-    events = events.order_by('date')
-
-    # Get the groups for each event through EventGroups
-    for event in events:
-        event.attending_groups = Group.objects.filter(
-            id__in=EventGroups.objects.filter(event=event).values_list('group_id', flat=True)
-        )
+    # Get organizations the user owns or is a member of
+    organizations = Organization.objects.filter(
+        Q(owner=request.user) | Q(user_organizations__user=request.user)
+    ).distinct()
+    
+    # Get user's groups
+    user_groups = UserGroups.objects.filter(user=request.user).values_list('group', flat=True)
+    
+    # Base query for events
+    events_query = Event.objects.filter(
+        Q(groups__group__in=user_groups) |  # Events where user's groups are attending
+        Q(organization__in=organizations)  # Events from organizations user owns or is a member of
+    ).distinct()
+    
+    # Apply organization filter if selected
+    selected_organization_id = request.GET.get('organization_id')
+    if selected_organization_id:
+        events_query = events_query.filter(organization_id=selected_organization_id)
+    
+    # Get current time in UTC
+    current_time = timezone.now()
+    
+    # Get all events and filter them in Python to handle timezone conversions properly
+    all_events = events_query.order_by('date', 'time')
+    upcoming_events = []
+    
+    for event in all_events:
+        # Get the event's timezone
+        event_tz = pytz.timezone(event.timezone)
         
-        # Create a datetime object for the event (using noon as default time)
-        event_datetime = timezone.make_aware(
-            datetime.combine(event.date, datetime_time(12, 0))
-        )
+        # Create a datetime object in the event's timezone
+        event_datetime = timezone.datetime.combine(event.date, event.time)
+        event_datetime = event_tz.localize(event_datetime)
         
-        # Calculate time until event
-        time_until = event_datetime - timezone.now()
-        event.minutes_until = int(time_until.total_seconds() / 60)
+        # Get current time in the event's timezone
+        current_time_tz = current_time.astimezone(event_tz)
         
-        # Calculate time display
-        if event.minutes_until >= 1440:  # More than 24 hours
-            days = event.minutes_until // 1440
-            remaining_minutes = event.minutes_until % 1440
-            hours = remaining_minutes // 60
-            event.time_display = f"{days}d {hours}h until event"
-        elif event.minutes_until >= 60:  # More than 1 hour
-            hours = event.minutes_until // 60
-            minutes = event.minutes_until % 60
-            event.time_display = f"{hours}h {minutes}m until event"
-        else:  # Less than 1 hour
-            event.time_display = f"{event.minutes_until}m until event"
+        # Calculate time difference
+        time_until = event_datetime - current_time_tz
+        minutes_until = int(time_until.total_seconds() / 60)
+        
+        # Only include events that haven't started yet or are within the check-in window
+        if minutes_until > -5:  # Changed from > 0 to > -5 to include events in progress
+            event.minutes_until = minutes_until
+            # Set can_check_in property - allow check-in 30 minutes before and 5 minutes after event
+            event.can_check_in = -5 <= minutes_until <= 30
+            # Set is_concluded property - event is concluded if it's more than 5 minutes past start time
+            event.is_concluded = minutes_until < -5
+            # Check if user has already checked in
+            event.user_check_in = EventCheckIn.objects.filter(
+                user=request.user,
+                event=event,
+                is_within_radius=True
+            ).exists()
+            # Get attending groups for the event
+            event.attending_groups = [event_group.group.name for event_group in event.groups.all()]
             
-        event.can_check_in = -30 <= event.minutes_until <= 0  # Can check in 30 minutes before event
-        event.is_past = event.minutes_until < -30  # Event is past if more than 30 minutes old
-        
-        # Get check-in status for current user
-        event.user_check_in = EventCheckIn.objects.filter(
-            event=event,
-            user=request.user,
-            is_within_radius=True
-        ).first()
+            # Calculate time display
+            if minutes_until >= 1440:  # More than 24 hours
+                days = minutes_until // 1440
+                remaining_minutes = minutes_until % 1440
+                hours = remaining_minutes // 60
+                event.time_display = f"{days}d {hours}h"
+            elif minutes_until >= 60:  # More than 1 hour
+                hours = minutes_until // 60
+                minutes = minutes_until % 60
+                event.time_display = f"{hours}h {minutes}m"
+            else:
+                event.time_display = f"{minutes_until}m"
+            
+            # Check if user's groups are attending this event
+            event.user_can_attend = any(group in user_groups for group in event.groups.values_list('group', flat=True))
+            
+            upcoming_events.append(event)
 
     context = {
-        'events': events,
-        'organizations': Organization.objects.filter(groups__in=user_groups).distinct() if not owned_organizations.exists() else owned_organizations,
-        'selected_organization_id': organization_id,
-        'selected_group_id': group_id,
+        'events': upcoming_events,
+        'organizations': organizations,
+        'selected_organization_id': selected_organization_id,
     }
-
     return render(request, 'viewevents.html', context)
 
+@login_required
+def view_past_events(request):
+    # Get organizations the user owns or is a member of
+    organizations = Organization.objects.filter(
+        Q(owner=request.user) | Q(user_organizations__user=request.user)
+    ).distinct()
+    
+    # Get user's groups
+    user_groups = UserGroups.objects.filter(user=request.user).values_list('group', flat=True)
+    
+    # Base query for events
+    events_query = Event.objects.filter(
+        Q(groups__group__in=user_groups) |  # Events where user's groups are attending
+        Q(organization__in=organizations)  # Events from organizations user owns or is a member of
+    ).distinct()
+    
+    # Apply organization filter if selected
+    selected_organization_id = request.GET.get('organization_id')
+    if selected_organization_id:
+        events_query = events_query.filter(organization_id=selected_organization_id)
+    
+    # Get current time in UTC
+    current_time = timezone.now()
+    
+    # Get all events and filter them in Python to handle timezone conversions properly
+    all_events = events_query.order_by('-date', '-time')
+    past_events = []
+    
+    for event in all_events:
+        # Get the event's timezone
+        event_tz = pytz.timezone(event.timezone)
+        
+        # Create a datetime object in the event's timezone
+        event_datetime = timezone.datetime.combine(event.date, event.time)
+        event_datetime = event_tz.localize(event_datetime)
+        
+        # Get current time in the event's timezone
+        current_time_tz = current_time.astimezone(event_tz)
+        
+        # Calculate time difference
+        time_until = event_datetime - current_time_tz
+        minutes_until = int(time_until.total_seconds() / 60)
+        
+        # Only include events that have already started
+        if minutes_until <= 0:
+            event.minutes_until = minutes_until
+            # Get attending groups for the event
+            event.attending_groups = [event_group.group.name for event_group in event.groups.all()]
+            # Check if user has already checked in
+            event.user_check_in = EventCheckIn.objects.filter(
+                user=request.user,
+                event=event,
+                is_within_radius=True
+            ).exists()
+            past_events.append(event)
 
-
+    context = {
+        'events': past_events,
+        'organizations': organizations,
+        'selected_organization_id': selected_organization_id,
+    }
+    return render(request, 'pastevents.html', context)
 
 
 @login_required
@@ -470,9 +605,15 @@ def create_org(request):
             # Automatically add the user as a member of the organization
             UserOrganization.objects.create(user=request.user, organization=organization)
             
+            # Check if this is the user's first organization
+            owned_orgs_count = Organization.objects.filter(owner=request.user).count()
+            
             # Optionally, add a success message
             messages.success(request, f"You've successfully created {organization.name} and joined it!")
 
+            # If this is the user's first organization, redirect to create group page
+            if owned_orgs_count == 1:
+                return redirect('creategroup')
             return redirect('home')
     else:
         form = CreateOrganizationForm()
@@ -508,24 +649,30 @@ def create_event(request):
     if request.method == 'POST':
         form = CreateEventForm(request.POST, user=request.user)
         if form.is_valid():
-            try:
-                event = form.save(commit=False)
-                event.owner = request.user
-                event.save()
-                form.save_m2m()  # Save many-to-many relationships (groups)
-                messages.success(request, 'Event created successfully!')
-                return redirect('viewevents')  # Changed from 'events' to 'viewevents'
-            except Exception as e:
-                messages.error(request, f'Error creating event: {str(e)}')
-        else:
-            messages.error(request, 'Please correct the errors below.')
+            event = form.save(commit=False)
+            event.owner = request.user
+            # Store the creator's timezone
+            event.timezone = request.POST.get('timezone', 'America/New_York')
+            event.save()
+            
+            # Handle groups
+            groups = form.cleaned_data.get('groups', [])
+            for group in groups:
+                EventGroups.objects.create(event=event, group=group)
+            
+            messages.success(request, 'Event created successfully!')
+            return redirect('viewevents')
     else:
         form = CreateEventForm(user=request.user)
     
-    return render(request, 'createevent.html', {
+    # Get user's timezone
+    user_timezone = request.POST.get('timezone', 'America/New_York')
+    
+    context = {
         'form': form,
-        'page_title': 'Create Event'
-    })
+        'user_timezone': user_timezone,
+    }
+    return render(request, 'createevent.html', context)
 
 @login_required
 def get_groups_by_org(request, org_id):
@@ -616,13 +763,24 @@ def update_event_group(request):
 
 @login_required
 def delete_event(request, event_id):
-    try:
-        event = get_object_or_404(Event, id=event_id, owner=request.user)
-        event.delete()
-        return redirect('viewevents')  # Redirect to the events page after deletion
-    except Exception as e:
-        messages.error(request, f'Error deleting event: {str(e)}')
-        return redirect('viewevents')
+    if request.method == 'POST':
+        try:
+            event = Event.objects.get(id=event_id)
+            # Check if the user is the owner of the event
+            if event.owner != request.user:
+                return JsonResponse({'success': False, 'error': 'You do not have permission to delete this event'})
+            
+            event_name = event.name  # Store the event name before deletion
+            event.delete()
+            return JsonResponse({
+                'success': True,
+                'message': f'Event "{event_name}" has been successfully deleted.'
+            })
+        except Event.DoesNotExist:
+            return JsonResponse({'success': False, 'error': 'Event not found'})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    return JsonResponse({'success': False, 'error': 'Invalid request method'})
 
 @login_required
 @csrf_exempt
@@ -665,29 +823,39 @@ def calculate_distance(lat1, lon1, lat2, lon2):
 def check_in_to_event(request, event_id):
     try:
         event = Event.objects.get(id=event_id)
-        latitude = request.POST.get('latitude')
-        longitude = request.POST.get('longitude')
+        
+        # Handle both JSON and form data
+        if request.content_type == 'application/json':
+            try:
+                data = json.loads(request.body)
+                latitude = data.get('latitude')
+                longitude = data.get('longitude')
+            except json.JSONDecodeError:
+                return JsonResponse({'error': 'Invalid JSON data'}, status=400)
+        else:
+            latitude = request.POST.get('latitude')
+            longitude = request.POST.get('longitude')
 
         if not latitude or not longitude:
             return JsonResponse({'error': 'Location data is required'}, status=400)
 
-        # Calculate time until event
-        time_until = event.date - timezone.now()
-        minutes_until = int(time_until.total_seconds() / 60)
-
-        # Check if user can check in (30 minutes before event)
-        if minutes_until > 0:
-            return JsonResponse({
-                'error': 'Check-in is only available 30 minutes before the event starts',
-                'minutes_until': minutes_until
-            }, status=400)
+        # Get the event's timezone
+        event_tz = pytz.timezone(event.timezone)
         
-        if minutes_until < -30:
-            return JsonResponse({
-                'error': 'Event has already ended',
-                'minutes_until': minutes_until
-            }, status=400)
-
+        # Create a datetime object in the event's timezone
+        event_datetime = timezone.datetime.combine(event.date, event.time)
+        event_datetime = event_tz.localize(event_datetime)
+        
+        # Get current time in the event's timezone
+        current_time = timezone.now().astimezone(event_tz)
+        
+        # Calculate time difference
+        time_until = event_datetime - current_time
+        minutes_until = int(time_until.total_seconds() / 60)
+        
+        # Check if within time window (-30 to 30 minutes around event time)
+        is_within_time = -30 <= minutes_until <= 30
+        
         # Calculate distance from event location
         distance = calculate_distance(
             event.geofence_latitude,
@@ -695,8 +863,22 @@ def check_in_to_event(request, event_id):
             latitude,
             longitude
         )
-
+        
+        # Check if within radius (convert radius to meters if needed)
         is_within_radius = distance <= event.geofence_radius
+
+        # Only allow check-in if both conditions are met
+        if not is_within_time:
+            return JsonResponse({
+                'error': 'Check-in is only available 30 minutes before and after the event time'
+            }, status=400)
+            
+        if not is_within_radius:
+            return JsonResponse({
+                'error': 'You must be within the event location to check in',
+                'distance': round(distance, 2),
+                'radius': event.geofence_radius
+            }, status=400)
 
         # Create or update check-in
         check_in, created = EventCheckIn.objects.update_or_create(
@@ -710,11 +892,21 @@ def check_in_to_event(request, event_id):
             }
         )
 
+        # Also update EventAttendance
+        attendance, _ = EventAttendance.objects.update_or_create(
+            user=request.user,
+            event=event,
+            defaults={
+                'check_in_time': timezone.now() if is_within_radius else None,
+                'is_attending': is_within_radius
+            }
+        )
+
         return JsonResponse({
             'success': True,
             'is_within_radius': is_within_radius,
             'distance': round(distance, 2),
-            'message': 'Check-in successful' if is_within_radius else 'You are not within the event radius'
+            'message': 'Check-in successful'
         })
 
     except Event.DoesNotExist:
@@ -728,30 +920,39 @@ def event_attendance(request, event_id):
     
     # Only event owners can view attendance
     if event.owner != request.user:
-        raise Http404("You don't have permission to view this event's attendance.")
+        messages.error(request, "You don't have permission to view this event's attendance.")
+        return redirect('home')
+    
+    # Get all groups assigned to this event through EventGroups
+    event_groups = Group.objects.filter(events__event=event)
     
     # Get all users who should attend (from groups assigned to the event)
     expected_attendees = User.objects.filter(
-        groups__in=event.groups.all()
-    ).distinct()
+        membership_groups__group__in=event_groups
+    ).exclude(id=event.owner.id).distinct()  # Exclude the event owner
     
     # Get all check-ins for this event
     check_ins = EventCheckIn.objects.filter(
         event=event,
         is_within_radius=True
-    ).select_related('user')
+    ).select_related('user').exclude(user=event.owner)  # Exclude the event owner
     
     # Create attendance lists
     attended = [check_in.user for check_in in check_ins]
     absent = [user for user in expected_attendees if user not in attended]
     
+    # Calculate attendance rate safely
+    total_expected = len(expected_attendees)
+    total_attended = len(attended)
+    attendance_rate = (total_attended / total_expected * 100) if total_expected > 0 else 0
+    
     context = {
         'event': event,
         'attended': attended,
         'absent': absent,
-        'total_expected': len(expected_attendees),
-        'total_attended': len(attended),
-        'attendance_rate': (len(attended) / len(expected_attendees) * 100) if expected_attendees else 0
+        'total_expected': total_expected,
+        'total_attended': total_attended,
+        'attendance_rate': attendance_rate
     }
     
     return render(request, 'event_attendance.html', context)
@@ -779,3 +980,69 @@ def help_support(request):
     return render(request, 'help.html', {
         'user': request.user,
     })
+
+@login_required
+def event_checkin_page(request, event_id):
+    event = get_object_or_404(Event, id=event_id)
+    
+    # Check if user is in any of the groups attending the event
+    user_groups = UserGroups.objects.filter(user=request.user).values_list('group', flat=True)
+    event_groups = EventGroups.objects.filter(event=event).values_list('group', flat=True)
+    user_can_attend = any(group in event_groups for group in user_groups)
+    
+    if not user_can_attend:
+        messages.error(request, "You are not authorized to check in to this event.")
+        return redirect('home')
+    
+    # Get the event's timezone
+    event_tz = pytz.timezone(event.timezone)
+    
+    # Create a datetime object in the event's timezone
+    event_datetime = timezone.datetime.combine(event.date, event.time)
+    event_datetime = event_tz.localize(event_datetime)
+    
+    # Get current time in the event's timezone
+    current_time = timezone.now().astimezone(event_tz)
+    
+    # Calculate time difference
+    time_until = event_datetime - current_time
+    minutes_until = int(time_until.total_seconds() / 60)
+    
+    # Debug prints
+    print(f"Current time (Event TZ): {current_time}")
+    print(f"Event time (Event TZ): {event_datetime}")
+    print(f"Minutes until event: {minutes_until}")
+    print(f"Can check in: {-30 <= minutes_until <= 30}")
+    
+    # Format time display
+    if minutes_until >= 1440:  # More than 24 hours
+        days = minutes_until // 1440
+        hours = (minutes_until % 1440) // 60
+        time_display = f"{days}d {hours}h"
+    elif minutes_until >= 60:  # More than 1 hour
+        hours = minutes_until // 60
+        minutes = minutes_until % 60
+        time_display = f"{hours}h {minutes}m"
+    else:
+        time_display = f"{minutes_until}m"
+    
+    # Set can_check_in property on the event object
+    event.minutes_until = minutes_until
+    event.time_display = time_display
+    event.can_check_in = -30 <= minutes_until <= 30
+    
+    # Check if user has already checked in
+    event.user_check_in = EventCheckIn.objects.filter(
+        event=event,
+        user=request.user,
+        is_within_radius=True
+    ).exists()
+    
+    # Get attending groups for the event
+    event.attending_groups = [event_group.group.name for event_group in event.groups.all()]
+    
+    context = {
+        'event': event,
+    }
+    
+    return render(request, 'event_checkin.html', context)

@@ -3,6 +3,7 @@ from django.contrib.auth.models import AbstractUser
 from django.conf import settings
 import random
 import string
+from django.utils import timezone
 
 class User(AbstractUser):
     f_name = models.CharField(max_length=255)
@@ -62,13 +63,16 @@ class Event(models.Model):
     name = models.CharField(max_length=255)
     description = models.TextField()
     date = models.DateField()
-    location = models.CharField(max_length=255, blank=True)
+    time = models.TimeField(default=timezone.datetime.min.time())  # Add time field with default midnight
+    location = models.CharField(max_length=255, default='No location specified')
     organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='events')
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='owned_events')
     # Geofence fields
     geofence_latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     geofence_longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     geofence_radius = models.PositiveIntegerField(null=True, blank=True, help_text="Radius in meters")
+    # Timezone field
+    timezone = models.CharField(max_length=50, default='America/New_York')
 
     def get_attending_groups(self):
         return self.groups.all()
@@ -147,3 +151,16 @@ class EventCheckIn(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - {self.event.name} - {self.check_in_time}"
+
+class EventAttendance(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='event_attendance')
+    event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='attendance')
+    check_in_time = models.DateTimeField(null=True, blank=True)
+    is_attending = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = 'EventAttendance'
+        unique_together = (('user', 'event'),)
+
+    def __str__(self):
+        return f"{self.user.username} - {self.event.name} - {'Attended' if self.is_attending else 'Not Attended'}"

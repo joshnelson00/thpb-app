@@ -79,6 +79,9 @@ class CreateEventForm(forms.ModelForm):
     date = forms.DateField(
         widget=forms.DateInput(attrs={'class': 'textbox', 'type': 'date'})
     )
+    time = forms.TimeField(
+        widget=forms.TimeInput(attrs={'class': 'textbox', 'type': 'time'})
+    )
     location = forms.CharField(
         max_length=255,
         widget=forms.TextInput(attrs={'class': 'textbox', 'placeholder': 'Event Location'})
@@ -114,17 +117,15 @@ class CreateEventForm(forms.ModelForm):
 
     class Meta:
         model = Event
-        fields = ['name', 'description', 'date', 'location', 'organization', 'groups', 'latitude', 'longitude', 'radius']
+        fields = ['name', 'description', 'date', 'time', 'location', 'organization', 'groups', 'latitude', 'longitude', 'radius']
 
     def __init__(self, *args, **kwargs):
         user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
         
-        # Set organization queryset based on user
+        # Set organization queryset based on user - only show organizations they own
         if user:
-            self.fields['organization'].queryset = Organization.objects.filter(
-                Q(owner=user) | Q(user_organizations__user=user)
-            ).distinct()
+            self.fields['organization'].queryset = Organization.objects.filter(owner=user)
             
             # Set groups queryset based on selected organization
             if 'organization' in self.data:

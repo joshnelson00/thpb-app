@@ -1,12 +1,12 @@
 {% extends 'index.html' %}
 {% load static %}
 
-{% block title %}Events{% endblock %}
+{% block title %}Upcoming Events{% endblock %}
 
 {% block content %}
 <div class="home-container">
     <div class="welcome-section">
-        <h1><i class="fas fa-calendar-alt"></i> Events</h1>
+        <h1><i class="fas fa-calendar-alt"></i> Upcoming Events</h1>
         <p class="welcome-message">View and manage your upcoming events.</p>
     </div>
 
@@ -36,51 +36,66 @@
         <!-- Events List -->
         <div class="dashboard-card">
             <div class="card-header">
-                <h2><i class="fas fa-list"></i> Upcoming Events</h2>
+                <h2><i class="fas fa-list"></i> {% if selected_organization_id %}Organization Events{% else %}All Events{% endif %}</h2>
             </div>
             <div class="card-content">
                 {% if events %}
                     {% for event in events %}
-                        <div class="event-item">
-                            <div class="event-date">
-                                <span class="day">{{ event.date|date:"d" }}</span>
-                                <span class="month">{{ event.date|date:"M" }}</span>
-                            </div>
-                            <div class="event-details">
-                                <h3>{{ event.name }}</h3>
-                                <p class="event-time"><i class="fas fa-calendar"></i> {{ event.date|date:"F j, Y" }}</p>
-                                <p class="event-location"><i class="fas fa-map-marker-alt"></i> {{ event.location }}</p>
-                                <div class="event-groups">
-                                    <i class="fas fa-users"></i>
-                                    Groups: {{ event.attending_groups|join:", " }}
+                        {% if event.owner == request.user or event.user_can_attend %}
+                            <div class="event-item">
+                                <div class="event-date">
+                                    <span class="day">{{ event.date|date:"d" }}</span>
+                                    <span class="month">{{ event.date|date:"M" }}</span>
                                 </div>
-                                
-                                <div class="event-status">
-                                    {% if event.is_past %}
-                                        <div class="status-badge past">
-                                            <i class="fas fa-calendar-check"></i>
-                                            Event Ended
-                                        </div>
-                                        {% if event.owner == request.user %}
-                                            <a href="{% url 'event_attendance' event.id %}" class="action-btn view-attendance">
-                                                <i class="fas fa-clipboard-list"></i>
-                                                View Attendance
-                                            </a>
+                                <div class="event-details">
+                                    <h3>{{ event.name }}</h3>
+                                    <p class="event-time"><i class="fas fa-calendar"></i> {{ event.date|date:"F j, Y" }} at {{ event.time|time:"g:i A" }}</p>
+                                    <p class="event-location"><i class="fas fa-map-marker-alt"></i> {{ event.location }}</p>
+                                    <div class="event-groups">
+                                        <i class="fas fa-users"></i>
+                                        Groups: 
+                                        {% if event.attending_groups %}
+                                            {% for group in event.attending_groups %}
+                                                <span class="group-tag">{{ group }}</span>{% if not forloop.last %} {% endif %}
+                                            {% endfor %}
+                                        {% else %}
+                                            <span class="no-groups">No groups assigned</span>
                                         {% endif %}
-                                    {% else %}
+                                    </div>
+                                    
+                                    <div class="event-status">
                                         <div class="countdown" data-minutes="{{ event.minutes_until }}">
-                                            {% if event.minutes_until > 0 %}
+                                            {% if event.minutes_until > 30 %}
                                                 <div class="status-badge upcoming">
                                                     <i class="fas fa-hourglass-half"></i>
                                                     <span class="countdown-text">
                                                         {{ event.time_display }}
                                                     </span>
                                                 </div>
-                                            {% else %}
+                                            {% elif event.minutes_until >= -5 %}
                                                 <div class="status-badge in-progress">
                                                     <i class="fas fa-play-circle"></i>
                                                     Event in progress
                                                 </div>
+                                                {% if not event.owner == request.user and not event.user_check_in and event.user_can_attend %}
+                                                    <div class="check-in-spacer"></div>
+                                                    <button class="action-btn check-in check-in-btn" data-event-id="{{ event.id }}">
+                                                        <i class="fas fa-map-marker-alt"></i>
+                                                        Check In
+                                                    </button>
+                                                {% endif %}
+                                            {% else %}
+                                                <div class="status-badge past">
+                                                    <i class="fas fa-calendar-check"></i>
+                                                    Event Ended
+                                                </div>
+                                                {% if event.owner == request.user %}
+                                                    <div class="check-in-spacer"></div>
+                                                    <a href="{% url 'event_attendance' event.id %}" class="action-btn view-attendance">
+                                                        <i class="fas fa-clipboard-list"></i>
+                                                        View Attendance
+                                                    </a>
+                                                {% endif %}
                                             {% endif %}
                                         </div>
 
@@ -92,25 +107,24 @@
                                         {% endif %}
 
                                         {% if not event.owner == request.user %}
-                                            {% if event.can_check_in %}
-                                                {% if event.user_check_in %}
-                                                    <div class="check-in-status checked-in">
-                                                        <i class="fas fa-check-circle"></i>
-                                                        Checked in
-                                                    </div>
-                                                {% else %}
-                                                    <button class="action-btn check-in" data-event-id="{{ event.id }}">
-                                                        <i class="fas fa-map-marker-alt"></i>
-                                                        Check In
-                                                    </button>
-                                                {% endif %}
+                                            {% if event.user_check_in %}
+                                                <div class="check-in-status checked-in">
+                                                    <i class="fas fa-check-circle"></i>
+                                                    Checked in
+                                                </div>
                                             {% endif %}
                                         {% endif %}
-                                    {% endif %}
+                                    </div>
                                 </div>
                             </div>
-                        </div>
+                        {% endif %}
                     {% endfor %}
+                    {% if not events|length %}
+                        <div class="empty-state">
+                            <i class="fas fa-calendar-times"></i>
+                            <p>No upcoming events found</p>
+                        </div>
+                    {% endif %}
                 {% else %}
                     <div class="empty-state">
                         <i class="fas fa-calendar-times"></i>
@@ -228,13 +242,14 @@
 
     .event-item {
         display: flex;
-        gap: 1.5rem;
+        gap: 2rem;
+        align-items: flex-start;
         padding: 1.5rem;
-        background: var(--darker-bg);
+        background: linear-gradient(to right, rgba(36, 36, 68, 0.95) 0%, rgba(26, 26, 46, 0.95) 100%);
         border-radius: 12px;
-        margin-bottom: 1.5rem;
         border: 1px solid var(--medium-blue-slate);
-        transition: all 0.3s ease;
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
     }
 
     .event-item:hover {
@@ -248,10 +263,9 @@
         align-items: center;
         justify-content: center;
         background: var(--medium-blue-slate);
-        padding: 1.5rem;
+        width: 120px;
+        height: 120px;
         border-radius: 12px;
-        width: 100px;
-        height: 100px;
         flex-shrink: 0;
     }
 
@@ -291,9 +305,9 @@
     .event-status {
         display: flex;
         align-items: center;
-        gap: 1rem;
-        margin-top: 1.5rem;
         flex-wrap: wrap;
+        margin-top: 1.5rem;
+        gap: 1rem;
     }
 
     .status-badge {
@@ -303,20 +317,22 @@
         padding: 0.75rem 1.25rem;
         border-radius: 25px;
         font-size: 1rem;
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
     }
 
     .status-badge.upcoming {
-        background: var(--medium-blue-slate);
+        background: rgba(72, 72, 102, 0.95);
         color: var(--white);
     }
 
     .status-badge.in-progress {
-        background: var(--celadon);
+        background: rgba(172, 225, 175, 0.95);
         color: var(--rich-black);
     }
 
     .status-badge.past {
-        background: var(--text-muted);
+        background: rgba(128, 128, 128, 0.95);
         color: var(--white);
     }
 
@@ -333,9 +349,13 @@
         transition: all 0.3s ease;
     }
 
+    .action-btn:last-child {
+        margin-right: 0;
+    }
+
     .action-btn.check-in {
-        background: var(--medium-blue-slate);
-        color: var(--white);
+        background: var(--celadon);
+        color: var(--rich-black);
     }
 
     .action-btn.edit {
@@ -344,8 +364,26 @@
     }
 
     .action-btn.view-attendance {
-        background: var(--celadon);
+        background: var(--medium-blue-slate);
+        color: var(--white);
+        display: inline-flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.75rem 1.25rem;
+        border-radius: 25px;
+        font-size: 1rem;
+        text-decoration: none;
+        transition: all 0.3s ease;
+    }
+
+    .action-btn.view-attendance:hover {
+        background: var(--periwinkle);
+        transform: translateY(-2px);
         color: var(--rich-black);
+    }
+
+    .action-btn.view-attendance i {
+        font-size: 1rem;
     }
 
     .action-btn:hover {
@@ -373,48 +411,179 @@
         color: var(--periwinkle);
     }
 
+    .event-groups {
+        margin: 0.5rem 0;
+        color: var(--text-muted);
+        font-size: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+    }
+
+    .group-tag {
+        background-color: var(--darker-bg);
+        color: var(--text-light);
+        padding: 0.3rem 0.8rem;
+        border-radius: 15px;
+        font-size: 0.9rem;
+        border: 1px solid var(--medium-blue-slate);
+        display: inline-block;
+        margin: 0.2rem 0;
+    }
+
+    .no-groups {
+        color: var(--text-muted);
+        font-style: italic;
+    }
+
+    .attendance-btn {
+        background: var(--medium-blue-slate);
+        color: var(--white);
+        padding: 0.5rem 1rem;
+        border-radius: 8px;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-top: 1rem;
+        transition: all 0.3s ease;
+    }
+
+    .attendance-btn:hover {
+        background: var(--periwinkle);
+        transform: translateY(-2px);
+    }
+
+    .countdown {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .check-in-spacer {
+        display: none;
+    }
+
     @media (max-width: 768px) {
         .home-container {
-            padding: 0 1rem;
-            margin: 1rem auto;
+            padding: 0 0.75rem;
+            margin: 0.75rem auto;
             width: 100%;
         }
 
+        .welcome-section {
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+        }
+
         .welcome-section h1 {
-            font-size: 2rem;
+            font-size: 1.75rem;
+        }
+
+        .welcome-message {
+            font-size: 1rem;
         }
 
         .dashboard-grid {
-            width: 90%;
+            width: 100%;
+            gap: 1rem;
+        }
+
+        .dashboard-card {
+            padding: 1rem;
+        }
+
+        .card-header {
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+        }
+
+        .card-header h2 {
+            font-size: 1.2rem;
         }
 
         .event-item {
             flex-direction: column;
-            gap: 1rem;
+            gap: 0.75rem;
+            padding: 0.75rem;
+            margin-bottom: 0.75rem;
         }
 
         .event-date {
-            width: 80px;
-            height: 80px;
-            padding: 1rem;
-        }
-
-        .event-date .day {
-            font-size: 2rem;
+            width: 100%;
+            height: 48px;
+            padding: 0.75rem;
+            flex-direction: row;
+            justify-content: center;
+            gap: 0.5rem;
+            margin-bottom: 0.75rem;
         }
 
         .event-date .month {
+            font-size: 1.2rem;
+            margin: 0;
+            order: 1;
+        }
+
+        .event-date .day {
+            font-size: 1.2rem;
+            margin: 0;
+            order: 2;
+        }
+
+        .event-details h3 {
             font-size: 1rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .event-time, .event-location, .event-groups {
+            font-size: 0.8rem;
+            margin: 0.25rem 0;
+        }
+
+        .group-tag {
+            padding: 0.15rem 0.4rem;
+            font-size: 0.75rem;
+            border-radius: 10px;
         }
 
         .event-status {
-            flex-direction: column;
-            align-items: flex-start;
+            margin-top: 0.75rem;
+            gap: 0.5rem;
+            justify-content: center;
+        }
+
+        .status-badge {
+            padding: 0.3rem 0.5rem;
+            font-size: 0.75rem;
         }
 
         .action-btn {
-            width: 100%;
-            justify-content: center;
+            padding: 0.3rem 0.5rem;
+            font-size: 0.75rem;
+        }
+
+        .check-in-status {
+            font-size: 0.75rem;
+        }
+
+        .empty-state {
+            padding: 1.5rem;
+        }
+
+        .empty-state i {
+            font-size: 2rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .empty-state p {
+            font-size: 1rem;
+        }
+
+        .form-group select {
+            padding: 0.75rem;
+            font-size: 0.9rem;
         }
     }
 </style>
@@ -476,12 +645,13 @@ function handleCheckIn(event) {
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
+                        // Replace button with success message
                         const statusDiv = document.createElement('div');
                         statusDiv.className = 'check-in-status checked-in';
                         statusDiv.innerHTML = '<i class="fas fa-check-circle"></i> Checked in';
                         button.parentNode.replaceChild(statusDiv, button);
                     } else {
-                        alert(data.message || 'Failed to check in. Please try again.');
+                        alert(data.error || 'Failed to check in. Please try again.');
                     }
                 })
                 .catch(error => {

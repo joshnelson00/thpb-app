@@ -1,0 +1,484 @@
+{% extends 'index.html' %}
+{% load static %}
+
+{% block content %}
+<div class="home-container">
+    <div class="welcome-section">
+        <h1><i class="fas fa-map-marker-alt"></i> Check In: {{ event.name }}</h1>
+        <p class="welcome-message">Verify your location to check in to this event.</p>
+    </div>
+
+    <div class="dashboard-grid">
+        <!-- Event Details Card -->
+        <div class="dashboard-card">
+            <div class="card-header">
+                <h2><i class="fas fa-info-circle"></i> Event Details</h2>
+            </div>
+            <div class="card-content">
+                <div class="event-item">
+                    <div class="event-date">
+                        <span class="day">{{ event.date|date:"d" }}</span>
+                        <span class="month">{{ event.date|date:"M" }}</span>
+                    </div>
+                    <div class="event-details">
+                        <h2>{{ event.name }}</h2>
+                        <p class="event-time"><i class="fas fa-calendar"></i> {{ event.date|date:"F j, Y" }} at {{ event.time|time:"g:i A" }}</p>
+                        <p class="event-location"><i class="fas fa-map-marker-alt"></i> {{ event.location }}</p>
+                        <div class="event-groups">
+                            <i class="fas fa-users"></i>
+                            Groups: 
+                            {% if event.attending_groups %}
+                                {% for group in event.attending_groups %}
+                                    <span class="group-tag">{{ group }}</span>{% if not forloop.last %} {% endif %}
+                                {% endfor %}
+                            {% else %}
+                                <span class="no-groups">No groups assigned</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Check In Card -->
+        <div class="dashboard-card">
+            <div class="card-header">
+                <h2><i class="fas fa-clock"></i> Check In Status</h2>
+            </div>
+            <div class="card-content">
+                <div class="check-in-status-container">
+                    <div class="countdown-section">
+                        <div class="countdown" data-minutes="{{ event.minutes_until }}">
+                            {% if event.minutes_until > 0 %}
+                                <div class="status-badge upcoming">
+                                    <i class="fas fa-hourglass-half"></i>
+                                    <span class="countdown-text">
+                                        {{ event.time_display }}
+                                    </span>
+                                </div>
+                            {% else %}
+                                <div class="status-badge in-progress">
+                                    <i class="fas fa-play-circle"></i>
+                                    Event in progress
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    {% if event.can_check_in %}
+                        {% if event.user_check_in %}
+                            <div class="check-in-success">
+                                <i class="fas fa-check-circle"></i>
+                                <h3>Successfully Checked In!</h3>
+                                <p>You have been checked in to this event.</p>
+                            </div>
+                        {% else %}
+                            <div class="check-in-form">
+                                <p class="check-in-message">Click the button below to check in to this event. Make sure you are at the event location.</p>
+                                <button id="checkInButton" class="action-btn check-in">
+                                    <i class="fas fa-map-marker-alt"></i>
+                                    Check In Now
+                                </button>
+                            </div>
+                        {% endif %}
+                    {% else %}
+                        <div class="check-in-not-available">
+                            <i class="fas fa-clock"></i>
+                            <h3>Check-in Not Available</h3>
+                            <p>Check-in will be available 30 minutes before the event starts.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .home-container {
+        max-width: 1080px;
+        margin: 2rem auto;
+        padding: 0 2rem;
+        width: 72%;
+    }
+
+    .welcome-section {
+        text-align: center;
+        margin-bottom: 2rem;
+        padding-bottom: 1.5rem;
+        border-bottom: 1px solid var(--medium-blue-slate);
+    }
+
+    .welcome-section h1 {
+        color: var(--text-light);
+        font-size: 2.5rem;
+        margin-bottom: 0.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.75rem;
+    }
+
+    .welcome-section h1 i {
+        color: var(--periwinkle);
+    }
+
+    .welcome-message {
+        color: var(--text-muted);
+        font-size: 1.1rem;
+    }
+
+    .dashboard-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 2rem;
+        width: 100%;
+        margin: 0 auto;
+    }
+
+    .dashboard-card {
+        background: linear-gradient(to bottom, var(--card-bg) 0%, var(--dark-bg) 100%);
+        border-radius: 16px;
+        padding: 2rem;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+        border: 1px solid var(--medium-blue-slate);
+    }
+
+    .card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid var(--medium-blue-slate);
+    }
+
+    .card-header h2 {
+        color: var(--text-light);
+        font-size: 1.5rem;
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .card-header h2 i {
+        color: var(--periwinkle);
+    }
+
+    .event-item {
+        display: flex;
+        gap: 1rem;
+        align-items: flex-start;
+        padding: 1.5rem;
+        background: var(--darker-bg);
+        border-radius: 12px;
+        border: 1px solid var(--medium-blue-slate);
+    }
+
+    .event-date {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: var(--medium-blue-slate);
+        width: 120px;
+        height: 120px;
+        border-radius: 12px;
+        flex-shrink: 0;
+    }
+
+    .event-date .day {
+        font-size: 3rem;
+        font-weight: bold;
+        color: var(--white);
+        line-height: 1;
+    }
+
+    .event-date .month {
+        font-size: 1.2rem;
+        color: var(--white);
+        text-transform: uppercase;
+        margin-top: 0.5rem;
+    }
+
+    .event-details {
+        flex: 1;
+    }
+
+    .event-details h2 {
+        color: var(--text-light);
+        font-size: 1.8rem;
+        margin: 0 0 1.5rem 0;
+        border-bottom: 2px solid var(--medium-blue-slate);
+        padding-bottom: 0.5rem;
+    }
+
+    .event-time {
+        color: var(--text-muted);
+        font-size: 1.2rem;
+        margin-bottom: 1rem;
+    }
+
+    .event-location {
+        color: var(--text-muted);
+        font-size: 1.2rem;
+        margin-bottom: 1rem;
+    }
+
+    .event-groups {
+        color: var(--text-muted);
+        font-size: 1.2rem;
+        margin-bottom: 1rem;
+    }
+
+    .group-tag {
+        background: var(--medium-blue-slate);
+        color: var(--white);
+        padding: 0.25rem 0.5rem;
+        border-radius: 12px;
+        margin-right: 0.5rem;
+    }
+
+    .no-groups {
+        color: var(--text-muted);
+    }
+
+    .check-in-status-container {
+        text-align: center;
+        padding: 2rem;
+    }
+
+    .countdown-section {
+        margin-bottom: 2rem;
+    }
+
+    .status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 1rem 2rem;
+        border-radius: 25px;
+        font-size: 1.2rem;
+    }
+
+    .status-badge.upcoming {
+        background: var(--medium-blue-slate);
+        color: var(--white);
+    }
+
+    .status-badge.in-progress {
+        background: var(--celadon);
+        color: var(--rich-black);
+    }
+
+    .check-in-form {
+        background: rgba(26, 26, 46, 0.95);
+        padding: 2rem;
+        border-radius: 12px;
+        border: 1px solid var(--medium-blue-slate);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+    }
+
+    .check-in-message {
+        color: var(--text-muted);
+        margin-bottom: 1.5rem;
+        font-size: 1.1rem;
+    }
+
+    .action-btn.check-in {
+        background: var(--medium-blue-slate);
+        color: var(--white);
+        padding: 1rem 2rem;
+        border-radius: 25px;
+        font-size: 1.2rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.75rem;
+        transition: all 0.3s ease;
+        border: none;
+        cursor: pointer;
+    }
+
+    .action-btn.check-in:hover {
+        background: var(--periwinkle);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+
+    .check-in-success {
+        background: var(--celadon);
+        color: var(--rich-black);
+        padding: 2rem;
+        border-radius: 12px;
+        text-align: center;
+    }
+
+    .check-in-success i {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+    }
+
+    .check-in-success h3 {
+        font-size: 1.5rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .check-in-not-available {
+        background: rgba(26, 26, 46, 0.95);
+        color: var(--text-muted);
+        padding: 2rem;
+        border-radius: 12px;
+        text-align: center;
+        border: 1px solid var(--medium-blue-slate);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+    }
+
+    .check-in-not-available i {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+        color: var(--periwinkle);
+    }
+
+    .check-in-not-available h3 {
+        font-size: 1.5rem;
+        margin-bottom: 0.5rem;
+        color: var(--text-light);
+    }
+
+    @media (max-width: 768px) {
+        .home-container {
+            padding: 0 1rem;
+            margin: 1rem auto;
+            width: 85%;
+        }
+
+        .event-item {
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            gap: 1.5rem;
+        }
+
+        .event-date {
+            width: 100px;
+            height: 100px;
+        }
+
+        .event-time {
+            font-size: 1rem;
+        }
+
+        .event-location {
+            font-size: 1rem;
+        }
+
+        .event-groups {
+            font-size: 1rem;
+        }
+
+        .status-badge {
+            padding: 0.75rem 1.5rem;
+            font-size: 1rem;
+        }
+
+        .action-btn.check-in {
+            width: 100%;
+            justify-content: center;
+        }
+    }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Update countdown timer every minute
+    setInterval(updateCountdown, 60000);
+    updateCountdown();
+
+    // Handle check-in button click
+    const checkInButton = document.getElementById('checkInButton');
+    if (checkInButton) {
+        checkInButton.addEventListener('click', handleCheckIn);
+    }
+});
+
+function updateCountdown() {
+    const countdown = document.querySelector('.countdown');
+    if (countdown) {
+        const minutes = parseInt(countdown.dataset.minutes);
+        const countdownText = countdown.querySelector('.countdown-text');
+        
+        if (countdownText) {
+            if (minutes >= 1440) {
+                const days = Math.floor(minutes / 1440);
+                const remainingMinutes = minutes % 1440;
+                const hours = Math.floor(remainingMinutes / 60);
+                countdownText.textContent = `${days}d ${hours}h`;
+            } else if (minutes >= 60) {
+                const hours = Math.floor(minutes / 60);
+                const remainingMinutes = minutes % 60;
+                countdownText.textContent = `${hours}h ${remainingMinutes}m`;
+            } else {
+                countdownText.textContent = `${minutes}m`;
+            }
+        }
+    }
+}
+
+function handleCheckIn() {
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            position => {
+                const data = {
+                    latitude: position.coords.latitude,
+                    longitude: position.coords.longitude
+                };
+
+                fetch(`/event/{{ event.id }}/check-in/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie('csrftoken')
+                    },
+                    body: JSON.stringify(data)
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        window.location.reload();
+                    } else {
+                        alert(data.error || 'Failed to check in. Please try again.');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Failed to check in. Please try again.');
+                });
+            },
+            error => {
+                alert('Please enable location services to check in.');
+            }
+        );
+    } else {
+        alert('Geolocation is not supported by your browser.');
+    }
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+</script>
+{% endblock %} 

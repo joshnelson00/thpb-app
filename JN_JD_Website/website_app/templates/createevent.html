@@ -14,16 +14,6 @@
                 <h2><i class="fas fa-info-circle"></i> Event Details</h2>
             </div>
             <div class="card-content">
-                {% if messages %}
-                <div class="messages">
-                    {% for message in messages %}
-                    <div class="alert alert-{{ message.tags }}">
-                        {{ message }}
-                    </div>
-                    {% endfor %}
-                </div>
-                {% endif %}
-                
                 <form method="post" class="event-form" id="eventForm">
                     {% csrf_token %}
                     
@@ -51,12 +41,23 @@
                     
                     <div class="form-group">
                         <div class="form-label">
-                            <i class="fas fa-calendar"></i>
+                            <i class="fas fa-calendar" style="color: var(--white);"></i>
                             Date
                         </div>
                         {{ form.date }}
                         {% if form.date.errors %}
                         <div class="error">{{ form.date.errors }}</div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="form-group">
+                        <div class="form-label">
+                            <i class="fas fa-clock" style="color: var(--white);"></i>
+                            Time
+                        </div>
+                        {{ form.time }}
+                        {% if form.time.errors %}
+                        <div class="error">{{ form.time.errors }}</div>
                         {% endif %}
                     </div>
                     
@@ -110,7 +111,7 @@
                             </div>
                             <div class="radius-control">
                                 <input type="range" id="radiusSlider" min="10" max="10000" step="10" value="50">
-                                <span id="radiusValue">50</span> meters
+                                <span id="radiusValue">50</span>
                                 <input type="hidden" name="radius" id="radiusInput" value="50">
                             </div>
                         </div>
@@ -122,8 +123,9 @@
                         </div>
                     </div>
                     
-                    <button type="submit" class="action-btn">
-                        <i class="fas fa-plus-circle"></i>
+                    <input type="hidden" name="timezone" id="timezone" value="{{ user_timezone }}">
+                    
+                    <button type="submit" class="submit-button">
                         Create Event
                     </button>
                 </form>
@@ -321,20 +323,24 @@ document.addEventListener('DOMContentLoaded', function() {
             alert('Please fill in all required fields');
         }
     });
+
+    // Set the timezone when the page loads
+    document.getElementById('timezone').value = Intl.DateTimeFormat().resolvedOptions().timeZone;
 });
 </script>
 
 <style>
     .home-container {
-        max-width: 1080px;
-        margin: 2rem auto;
+        max-width: 1000px;
+        margin: 1rem auto;
         padding: 0 2rem;
-        width: 72%;
+        width: auto;
     }
 
     .welcome-section {
         text-align: center;
-        margin-bottom: 2rem;
+        margin-bottom: 1rem;
+        margin-top: 1rem;
         padding-bottom: 1.5rem;
         border-bottom: 1px solid var(--medium-blue-slate);
     }
@@ -367,11 +373,13 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     .dashboard-card {
-        background: linear-gradient(to bottom, var(--card-bg) 0%, var(--dark-bg) 100%);
+        background: linear-gradient(to bottom, rgba(36, 36, 68, 0.95) 0%, rgba(26, 26, 46, 0.95) 100%);
         border-radius: 16px;
         padding: 2rem;
         box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
         border: 1px solid var(--medium-blue-slate);
+        max-width: 800px;
+        margin: 0 auto;
     }
 
     .card-header {
@@ -418,6 +426,9 @@ document.addEventListener('DOMContentLoaded', function() {
     .form-group select,
     .form-group textarea {
         width: 100%;
+        max-width: 600px;
+        margin: 0 auto;
+        display: block;
         padding: 0.75rem;
         background: var(--darker-bg);
         border: 1px solid var(--medium-blue-slate);
@@ -443,10 +454,11 @@ document.addEventListener('DOMContentLoaded', function() {
     .map-container {
         height: 40vh;
         width: 100%;
+        max-width: 600px;
+        margin: 1rem auto;
         border-radius: 8px;
         overflow: hidden;
         border: 1px solid var(--medium-blue-slate);
-        margin: 1rem 0;
     }
 
     .radius-control {
@@ -467,6 +479,40 @@ document.addEventListener('DOMContentLoaded', function() {
         border-radius: 3px;
         outline: none;
         -webkit-appearance: none;
+        cursor: pointer;
+        border: 1px solid var(--medium-blue-slate);
+    }
+
+    #radiusSlider::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 18px;
+        height: 18px;
+        background: linear-gradient(to right, var(--medium-blue-slate) 0%, var(--periwinkle) 100%);
+        border-radius: 50%;
+        cursor: pointer;
+        border: 2px solid var(--white);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        transition: all 0.2s ease;
+    }
+
+    #radiusSlider::-webkit-slider-thumb:hover {
+        transform: scale(1.1);
+    }
+
+    #radiusSlider::-moz-range-thumb {
+        width: 18px;
+        height: 18px;
+        background: linear-gradient(to right, var(--medium-blue-slate) 0%, var(--periwinkle) 100%);
+        border-radius: 50%;
+        cursor: pointer;
+        border: 2px solid var(--white);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        transition: all 0.2s ease;
+    }
+
+    #radiusSlider::-moz-range-thumb:hover {
+        transform: scale(1.1);
     }
 
     #radiusValue {
@@ -474,20 +520,26 @@ document.addEventListener('DOMContentLoaded', function() {
         font-weight: 500;
         font-size: 1.1rem;
         text-align: center;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.25rem;
     }
 
     #radiusValue::after {
-        content: " meters";
+        content: "meters";
         font-size: 0.9rem;
         color: var(--text-muted);
-        margin-left: 0.25rem;
     }
 
     .groups-checkbox-container {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
         gap: 1rem;
         margin-top: 1rem;
+        max-width: 600px;
+        margin-left: auto;
+        margin-right: auto;
     }
 
     .group-checkbox-item {
@@ -495,10 +547,12 @@ document.addEventListener('DOMContentLoaded', function() {
         align-items: center;
         gap: 0.75rem;
         padding: 0.75rem;
-        background: var(--darker-bg);
+        background: rgba(26, 26, 46, 0.95);
         border-radius: 8px;
         border: 1px solid var(--medium-blue-slate);
         transition: all 0.3s ease;
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
     }
 
     .group-checkbox-item:hover {
@@ -517,32 +571,31 @@ document.addEventListener('DOMContentLoaded', function() {
         cursor: pointer;
     }
 
-    .action-btn {
-        width: auto;
-        min-width: 200px;
-        max-width: 300px;
-        padding: 0.75rem 1.5rem;
-        background: var(--medium-blue-slate);
+    .submit-button {
+        width: 150px;
+        padding: 0.75rem;
+        background: linear-gradient(to right, var(--medium-blue-slate) 0%, var(--periwinkle) 100%);
         color: var(--white);
         border: none;
         border-radius: 8px;
         font-size: 1rem;
-        cursor: pointer;
+        font-weight: 500;
         display: flex;
         align-items: center;
         justify-content: center;
-        gap: 0.75rem;
+        cursor: pointer;
         transition: all 0.3s ease;
+        transform: translateY(0);
         margin: 2rem auto 0;
     }
 
-    .action-btn:hover {
-        background: var(--periwinkle);
-        transform: translateY(-2px);
+    .submit-button:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
     }
 
-    .action-btn i {
-        font-size: 1.2rem;
+    .submit-button:active {
+        transform: translateY(0);
     }
 
     .error {
