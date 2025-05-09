@@ -164,6 +164,14 @@ $(document).ready(function() {
         }
     });
 
+    // Variables for touch handling
+    let draggedUser = null;
+    let touchStartY = 0;
+    let touchStartX = 0;
+    let offsetX = 0;
+    let offsetY = 0;
+    let ghostElement = null;
+
     // Make all users draggable
     $(".movable-group").attr("draggable", true);
 
@@ -280,6 +288,148 @@ $(document).ready(function() {
             }
         }, { offset: Number.NEGATIVE_INFINITY }).element;
     }
+
+    // Touch event handlers for mobile devices
+    $(".movable-group").on("touchstart", function(event) {
+        draggedUser = $(this);
+        const touch = event.touches[0];
+        const rect = this.getBoundingClientRect();
+        
+        offsetX = touch.clientX - rect.left;
+        offsetY = touch.clientY - rect.top;
+        
+        // Create ghost element
+        ghostElement = draggedUser.clone();
+        ghostElement.addClass('ghost-element');
+        ghostElement.css({
+            position: 'fixed',
+            top: touch.clientY - offsetY + 'px',
+            left: touch.clientX - offsetX + 'px',
+            width: draggedUser.width() + 'px',
+            zIndex: 1000,
+            transform: 'scale(1.05)',
+            opacity: 0.8
+        });
+        
+        $('body').append(ghostElement);
+        draggedUser.addClass('dragging');
+        event.preventDefault();
+    });
+
+    // Handle touch move
+    $(document).on("touchmove", function(event) {
+        if (draggedUser && ghostElement) {
+            event.preventDefault();
+            const touch = event.touches[0];
+            
+            requestAnimationFrame(() => {
+                ghostElement.css({
+                    top: touch.clientY - offsetY + 'px',
+                    left: touch.clientX - offsetX + 'px'
+                });
+            });
+            
+            const targetElement = document.elementFromPoint(touch.clientX, touch.clientY);
+            
+            if (targetElement) {
+                const targetContainer = $(targetElement).closest('.movable-groups');
+                if (targetContainer.length) {
+                    $('.movable-groups').removeClass('drag-over');
+                    targetContainer.addClass('drag-over');
+                }
+            }
+        }
+    });
+
+    // Handle touch end
+    $(document).on("touchend", function(event) {
+        if (draggedUser && ghostElement) {
+            const touch = event.changedTouches[0];
+            const targetElement = document.elementFromPoint(touch.clientX, touch.clientY);
+            
+            if (targetElement) {
+                const targetContainer = $(targetElement).closest('.movable-groups');
+                if (targetContainer.length) {
+                    const userId = draggedUser.attr("id").replace("user", "");
+                    const isAvailableUsers = targetContainer.attr("id") === "available-users";
+                    const groupId = isAvailableUsers ? null : targetContainer.data("group-id");
+                    
+                    // Store the original container for reference
+                    const originalContainer = draggedUser.parent();
+                    
+                    $.ajax({
+                        url: '/update-user-group/',
+                        method: 'POST',
+                        contentType: 'application/json',
+                        data: JSON.stringify({
+                            user_id: userId,
+                            group_id: groupId,
+                            action: isAvailableUsers ? 'remove' : 'add'
+                        }),
+                        headers: {
+                            'X-CSRFToken': csrftoken
+                        },
+                        success: function(response) {
+                            if (response.success) {
+                                // Move the user element to the new container
+                                draggedUser.appendTo(targetContainer);
+                                
+                                // Update counts for both the original and target containers
+                                updateAllCounts();
+                                
+                                // Force a reflow to ensure proper rendering
+                                document.body.offsetHeight;
+                                
+                                // Add a visual feedback animation
+                                draggedUser.addClass('drop-success');
+                                setTimeout(() => {
+                                    draggedUser.removeClass('drop-success');
+                                }, 500);
+                            } else {
+                                console.error("Error:", response.error);
+                                alert("Error updating user group: " + response.error);
+                            }
+                        },
+                        error: function(xhr, status, error) {
+                            console.error("AJAX Error:", status, error);
+                            alert("Error updating user group. Please try again.");
+                        },
+                        complete: function() {
+                            // Clean up regardless of success or failure
+                            requestAnimationFrame(() => {
+                                ghostElement.remove();
+                                ghostElement = null;
+                                $('.movable-groups').removeClass('drag-over');
+                                draggedUser.removeClass('dragging');
+                                draggedUser = null;
+                                
+                                // Force final update
+                                updateAllCounts();
+                            });
+                        }
+                    });
+                } else {
+                    // If dropped outside a valid container, clean up
+                    requestAnimationFrame(() => {
+                        ghostElement.remove();
+                        ghostElement = null;
+                        $('.movable-groups').removeClass('drag-over');
+                        draggedUser.removeClass('dragging');
+                        draggedUser = null;
+                    });
+                }
+            } else {
+                // If no target element found, clean up
+                requestAnimationFrame(() => {
+                    ghostElement.remove();
+                    ghostElement = null;
+                    $('.movable-groups').removeClass('drag-over');
+                    draggedUser.removeClass('dragging');
+                    draggedUser = null;
+                });
+            }
+        }
+    });
 
     // Initialize counts on page load
     updateAllCounts();
@@ -730,10 +880,20 @@ $(document).ready(function() {
         }
 
         .movable-group {
-            padding: 0.35rem 0.6rem;
-            font-size: 0.85rem;
-            min-width: 100px;
-            height: 28px;
+            padding: 0.5rem 0.75rem;
+            margin: 0.25rem 0;
+            font-size: 0.9rem;
+            touch-action: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .movable-groups {
+            min-height: 80px;
+            max-height: 200px;
+            overflow-y: auto;
+            padding: 0.5rem;
+            margin: 0;
+            -webkit-overflow-scrolling: touch;
         }
 
         .delete-org-section {
@@ -846,6 +1006,64 @@ $(document).ready(function() {
     .card-content {
         position: relative;
         z-index: 1;
+    }
+
+    /* Add new styles for touch interactions */
+    .ghost-element {
+        background: rgba(72, 72, 102, 0.95);
+        border: 2px solid var(--periwinkle);
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        pointer-events: none;
+        opacity: 0.8;
+        transform: scale(1.05);
+        pointer-events: none;
+        transform: translateZ(0);
+        will-change: transform;
+    }
+
+    .movable-groups.drag-over {
+        background: rgba(72, 72, 102, 0.95);
+        border: 2px dashed var(--periwinkle);
+        transform: scale(1.02);
+        transition: all 0.2s ease;
+    }
+
+    .movable-group {
+        touch-action: none;
+        user-select: none;
+        -webkit-user-select: none;
+        transition: all 0.2s ease;
+    }
+
+    .movable-group.dragging {
+        opacity: 0.5;
+        transform: scale(0.95);
+    }
+
+    /* Add animation for successful drop */
+    .movable-group.drop-success {
+        animation: dropSuccess 0.5s ease-out;
+    }
+
+    @keyframes dropSuccess {
+        0% {
+            transform: scale(1.05);
+            background-color: var(--periwinkle);
+        }
+        50% {
+            transform: scale(1.02);
+            background-color: var(--medium-blue-slate);
+        }
+        100% {
+            transform: scale(1);
+            background-color: var(--darker-bg);
+        }
+    }
+
+    /* Ensure smooth transitions */
+    .movable-groups {
+        transition: all 0.2s ease;
     }
 </style>
 

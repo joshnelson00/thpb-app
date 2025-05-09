@@ -855,7 +855,7 @@ def check_in_to_event(request, event_id):
         
         # Check if within time window (-30 to 30 minutes around event time)
         is_within_time = -30 <= minutes_until <= 30
-        
+
         # Calculate distance from event location
         distance = calculate_distance(
             event.geofence_latitude,
@@ -863,7 +863,7 @@ def check_in_to_event(request, event_id):
             latitude,
             longitude
         )
-        
+
         # Check if within radius (convert radius to meters if needed)
         is_within_radius = distance <= event.geofence_radius
 
