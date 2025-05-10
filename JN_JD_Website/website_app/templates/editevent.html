@@ -8,45 +8,50 @@
         <p class="welcome-message">Modify event details and manage assigned groups.</p>
     </div>
 
-    <div class="dashboard-grid">
+    <form id="editEventForm" class="dashboard-grid">
+        {% csrf_token %}
         <!-- Event Details Card -->
         <div class="dashboard-card">
             <div class="card-header">
                 <h2><i class="fas fa-info-circle"></i> Event Details</h2>
             </div>
             <div class="card-content">
-                <div class="event-item">
-                    <div class="event-date">
-                        <span class="day">{{ event.date.day }}</span>
-                        <span class="month">{{ event.date|date:"M" }}</span>
+                <div class="event-form">
+                    <div class="form-group">
+                        <label for="event-name">Event Name</label>
+                        <input type="text" id="event-name" name="name" value="{{ event.name }}" required>
                     </div>
-                    <div class="event-details">
-                        <h3>{{ event.name }}</h3>
-                        <div class="event-attribute">
-                            <div class="event-attribute-label">
-                                <i class="fas fa-calendar"></i>
-                                Date:
-                            </div>
-                            <span class="event-attribute-value">
-                                {{ event.date|date:"F j, Y" }}
-                            </span>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="event-date">Date</label>
+                            <input type="date" id="event-date" name="date" value="{{ event.date|date:'Y-m-d' }}" required>
                         </div>
-                        <div class="event-attribute">
-                            <div class="event-attribute-label">
-                                <i class="fas fa-map-marker-alt"></i>
-                                Location:
-                            </div>
-                            <span class="event-attribute-value">
-                                {{ event.location }}
-                            </span>
+                        <div class="form-group">
+                            <label for="event-time">Time</label>
+                            <input type="time" id="event-time" name="time" value="{{ event.time|time:'H:i' }}" required>
                         </div>
-                        <div class="event-description">
-                            <div class="event-description-label">
-                                <i class="fas fa-align-left"></i>
-                                Description:
-                            </div>
-                            <div class="event-description-content">{{ event.description }}</div>
-                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="event-location">Location</label>
+                        <input type="text" id="event-location" name="location" value="{{ event.location }}" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="event-description">Description</label>
+                        <textarea id="event-description" name="description" rows="4" required>{{ event.description }}</textarea>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit" class="action-btn save">
+                            <i class="fas fa-save"></i>
+                            Save Changes
+                        </button>
+                        <button type="reset" class="action-btn reset">
+                            <i class="fas fa-undo"></i>
+                            Reset Changes
+                        </button>
                     </div>
                 </div>
             </div>
@@ -96,19 +101,60 @@
             <div class="card-content">
                 <div class="delete-section">
                     <p>Once you delete an event, there is no going back. Please be certain.</p>
-                    <button id="deleteEvent" class="action-btn delete">
+                    <button type="button" id="deleteEvent" class="action-btn delete">
                         <i class="fas fa-trash-alt"></i>
                         Delete Event
                     </button>
                 </div>
             </div>
         </div>
-    </div>
+    </form>
 </div>
 
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script>
     $(document).ready(function() {
+        // Form submission handler
+        $('#editEventForm').on('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = {
+                name: $('#event-name').val(),
+                date: $('#event-date').val(),
+                time: $('#event-time').val(),
+                location: $('#event-location').val(),
+                description: $('#event-description').val()
+            };
+
+            $.ajax({
+                url: "{% url 'editevent' event.id %}",
+                method: 'POST',
+                data: formData,
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                success: function(response) {
+                    if (response.success) {
+                        alert('Event updated successfully');
+                        window.location.href = "{% url 'viewevents' %}";
+                    } else {
+                        alert('Error updating event: ' + (response.error || 'Unknown error occurred'));
+                    }
+                },
+                error: function(xhr, status, error) {
+                    alert('Error updating event: ' + (xhr.responseJSON?.error || 'Unknown error occurred'));
+                }
+            });
+        });
+
+        // Reset form handler
+        $('.action-btn.reset').on('click', function(e) {
+            e.preventDefault();
+            if (confirm('Are you sure you want to reset all changes?')) {
+                $('#editEventForm')[0].reset();
+            }
+        });
+
         // Delete event functionality
         $('#deleteEvent').on('click', function() {
             if (confirm('Are you sure you want to delete this event? This action cannot be undone.')) {
@@ -133,6 +179,7 @@
             }
         });
 
+        // Existing drag and drop functionality
         let draggedGroup = null;
         let touchStartY = 0;
         let touchStartX = 0;
@@ -140,15 +187,13 @@
         let offsetY = 0;
         let ghostElement = null;
 
-        // Function to update group counts and ensure proper DOM updates
+        // Function to update group counts
         function updateGroupCounts() {
             const availableCount = $("#available-groups .movable-group").length;
             const assignedCount = $("#assigned-groups .movable-group").length;
             
             $("#available-groups").attr("data-count", availableCount);
             $("#assigned-groups").attr("data-count", assignedCount);
-
-            // Force a reflow to ensure browsers update the display
             document.body.offsetHeight;
         }
 
@@ -168,7 +213,7 @@
             $('.movable-groups').removeClass('drag-over');
         });
 
-        // Function to handle group movement with improved support
+        // Function to handle group movement
         function moveGroup(groupId, targetContainer, action) {
             return new Promise((resolve, reject) => {
                 $.ajax({
@@ -185,14 +230,9 @@
                     },
                     success: function(response) {
                         if (response.success) {
-                            // Use jQuery's detach to preserve event handlers
                             const $group = $("#group" + groupId).detach();
                             targetContainer.append($group);
-                            
-                            // Force a reflow
                             document.body.offsetHeight;
-                            
-                            // Update counts after DOM manipulation
                             updateGroupCounts();
                             resolve(response);
                         } else {
@@ -206,7 +246,7 @@
             });
         }
 
-        // Handle drag over for both containers
+        // Handle drag over
         $(".movable-groups").on("dragover", function(event) {
             event.preventDefault();
             $(this).addClass('drag-over');
@@ -224,7 +264,6 @@
             
             moveGroup(group_id, $(this), "remove")
                 .then(function(response) {
-                    // Force a reflow after successful move
                     document.body.offsetHeight;
                 })
                 .catch(function(error) {
@@ -241,7 +280,6 @@
             
             moveGroup(group_id, $(this), "add")
                 .then(function(response) {
-                    // Force a reflow after successful move
                     document.body.offsetHeight;
                 })
                 .catch(function(error) {
@@ -249,112 +287,6 @@
                 });
             
             $(this).removeClass('drag-over');
-        });
-
-        // Handle touch start with improved mobile support
-        $(".movable-group").on("touchstart", function(event) {
-            draggedGroup = $(this);
-            const touch = event.touches[0];
-            const rect = this.getBoundingClientRect();
-            
-            offsetX = touch.clientX - rect.left;
-            offsetY = touch.clientY - rect.top;
-            
-            // Create ghost element with improved mobile styling
-            ghostElement = draggedGroup.clone();
-            ghostElement.addClass('ghost-element');
-            ghostElement.css({
-                position: 'fixed',
-                top: touch.clientY - offsetY + 'px',
-                left: touch.clientX - offsetX + 'px',
-                width: draggedGroup.width() + 'px',
-                zIndex: 1000,
-                transform: 'scale(1.05)',
-                opacity: 0.8
-            });
-            
-            $('body').append(ghostElement);
-            draggedGroup.addClass('dragging');
-            event.preventDefault();
-        });
-
-        // Handle touch move with improved mobile support
-        $(document).on("touchmove", function(event) {
-            if (draggedGroup && ghostElement) {
-                event.preventDefault();
-                const touch = event.touches[0];
-                
-                // Update ghost element position with improved mobile accuracy
-                requestAnimationFrame(() => {
-                    ghostElement.css({
-                        top: touch.clientY - offsetY + 'px',
-                        left: touch.clientX - offsetX + 'px'
-                    });
-                });
-                
-                const targetElement = document.elementFromPoint(touch.clientX, touch.clientY);
-                
-                if (targetElement) {
-                    const targetContainer = $(targetElement).closest('.movable-groups');
-                    if (targetContainer.length) {
-                        $('.movable-groups').removeClass('drag-over');
-                        targetContainer.addClass('drag-over');
-                    }
-                }
-            }
-        });
-
-        // Handle touch end with improved mobile support
-        $(document).on("touchend", function(event) {
-            if (draggedGroup && ghostElement) {
-                const touch = event.changedTouches[0];
-                const targetElement = document.elementFromPoint(touch.clientX, touch.clientY);
-                
-                if (targetElement) {
-                    const targetContainer = $(targetElement).closest('.movable-groups');
-                    if (targetContainer.length) {
-                        const groupId = draggedGroup.attr("id").replace("group", "");
-                        const isAvailableGroups = targetContainer.attr("id") === "available-groups";
-                        const action = isAvailableGroups ? "remove" : "add";
-                        
-                        moveGroup(groupId, targetContainer, action)
-                            .then(function(response) {
-                                // Force a reflow after successful move
-                                document.body.offsetHeight;
-                            })
-                            .catch(function(error) {
-                                console.error("AJAX Error:", error);
-                            });
-                    }
-                }
-                
-                // Clean up with improved mobile support
-                requestAnimationFrame(() => {
-                    ghostElement.remove();
-                    ghostElement = null;
-                    $('.movable-groups').removeClass('drag-over');
-                    draggedGroup.removeClass('dragging');
-                    draggedGroup = null;
-                    
-                    // Force final update
-                    updateGroupCounts();
-                });
-            }
-        });
-
-        // Handle double-click with improved support
-        $("#assigned-groups").on("dblclick", ".movable-group", function() {
-            let group_id = $(this).attr("id").replace("group", "");
-            let $groupElement = $(this);
-
-            moveGroup(group_id, $("#available-groups"), "remove")
-                .then(function(response) {
-                    // Force a reflow after successful move
-                    document.body.offsetHeight;
-                })
-                .catch(function(error) {
-                    console.error("AJAX Error:", error);
-            });
         });
 
         // Initialize group counts
@@ -430,6 +362,98 @@
         color: var(--periwinkle);
     }
 
+    /* Form Styles */
+    .event-form {
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+    }
+
+    .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .form-row {
+        display: flex;
+        gap: 1rem;
+    }
+
+    .form-group label {
+        color: var(--text-light);
+        font-size: 1rem;
+        font-weight: 500;
+    }
+
+    .form-group input,
+    .form-group textarea {
+        padding: 0.75rem;
+        border: 1px solid var(--medium-blue-slate);
+        border-radius: 8px;
+        background: var(--darker-bg);
+        color: var(--text-light);
+        font-size: 1rem;
+        transition: all 0.3s ease;
+    }
+
+    .form-group input:focus,
+    .form-group textarea:focus {
+        border-color: var(--periwinkle);
+        outline: none;
+        box-shadow: 0 0 0 2px rgba(102, 102, 255, 0.2);
+    }
+
+    .form-actions {
+        display: flex;
+        gap: 1rem;
+        margin-top: 1rem;
+    }
+
+    .action-btn {
+        padding: 0.75rem 1.5rem;
+        border-radius: 8px;
+        border: none;
+        cursor: pointer;
+        font-size: 1rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.75rem;
+        transition: all 0.3s ease;
+    }
+
+    .action-btn.save {
+        background: var(--medium-blue-slate);
+        color: var(--white);
+    }
+
+    .action-btn.save:hover {
+        background: var(--periwinkle);
+        transform: translateY(-2px);
+    }
+
+    .action-btn.reset {
+        background: var(--darker-bg);
+        color: var(--text-light);
+        border: 1px solid var(--medium-blue-slate);
+    }
+
+    .action-btn.reset:hover {
+        background: var(--card-bg);
+        border-color: var(--periwinkle);
+    }
+
+    .action-btn.delete {
+        background: #dc3545;
+        color: var(--white);
+    }
+
+    .action-btn.delete:hover {
+        background: #c82333;
+        transform: translateY(-2px);
+    }
+
+    /* Groups Management Styles */
     .groups-management {
         display: flex;
         gap: 2rem;
@@ -454,9 +478,6 @@
         border: 1px solid var(--medium-blue-slate);
         backdrop-filter: blur(8px);
         -webkit-backdrop-filter: blur(8px);
-        -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
-        transform: translateZ(0); /* Force GPU acceleration */
-        will-change: transform; /* Optimize for animations */
     }
 
     .movable-group {
@@ -470,14 +491,6 @@
         align-items: center;
         gap: 0.75rem;
         transition: all 0.3s ease;
-        backdrop-filter: blur(8px);
-        -webkit-backdrop-filter: blur(8px);
-        -webkit-tap-highlight-color: transparent; /* Remove tap highlight on iOS */
-        touch-action: none;
-        user-select: none;
-        -webkit-user-select: none;
-        transform: translateZ(0); /* Force GPU acceleration */
-        will-change: transform; /* Optimize for animations */
     }
 
     .movable-group:hover {
@@ -495,8 +508,6 @@
         background: rgba(26, 26, 46, 0.95);
         border-radius: 12px;
         border: 1px solid var(--medium-blue-slate);
-        backdrop-filter: blur(8px);
-        -webkit-backdrop-filter: blur(8px);
     }
 
     .delete-section p {
@@ -504,126 +515,7 @@
         margin-bottom: 1.5rem;
     }
 
-    .action-btn.delete {
-        background: #dc3545;
-        color: var(--white);
-        padding: 0.75rem 1.5rem;
-        border-radius: 25px;
-        border: none;
-        cursor: pointer;
-        font-size: 1rem;
-        display: inline-flex;
-        align-items: center;
-        gap: 0.75rem;
-        transition: all 0.3s ease;
-    }
-
-    .action-btn.delete:hover {
-        background: #c82333;
-        transform: translateY(-2px);
-    }
-
-    .event-item {
-        display: flex;
-        gap: 2rem;
-        align-items: flex-start;
-        padding: 1.5rem;
-        background: linear-gradient(to right, rgba(36, 36, 68, 0.95) 0%, rgba(26, 26, 46, 0.95) 100%);
-        border-radius: 12px;
-        border: 1px solid var(--medium-blue-slate);
-        backdrop-filter: blur(8px);
-        -webkit-backdrop-filter: blur(8px);
-    }
-
-    .event-date {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        background: var(--medium-blue-slate);
-        width: 120px;
-        height: 120px;
-        border-radius: 12px;
-        flex-shrink: 0;
-    }
-
-    .event-date .day {
-        font-size: 3rem;
-        font-weight: bold;
-        color: var(--white);
-        line-height: 1;
-    }
-
-    .event-date .month {
-        font-size: 1.2rem;
-        color: var(--white);
-        text-transform: uppercase;
-        margin-top: 0.5rem;
-    }
-
-    .event-details {
-        flex: 1;
-        max-width: 600px;
-    }
-
-    .event-details h3 {
-        color: var(--text-light);
-        font-size: 1.8rem;
-        margin: 0 0 1.5rem 0;
-        border-bottom: 2px solid var(--medium-blue-slate);
-        padding-bottom: 0.5rem;
-    }
-
-    .event-attribute {
-        display: flex;
-        margin: 1rem 0;
-        color: var(--text-muted);
-    }
-
-    .event-attribute-label {
-        min-width: 120px;
-        font-weight: 500;
-        color: var(--text-light);
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-    }
-
-    .event-attribute-label i {
-        color: var(--periwinkle);
-        width: 16px;
-    }
-
-    .event-attribute-value {
-        flex: 1;
-        color: var(--text-muted);
-    }
-
-    .event-description {
-        margin-top: 1.5rem;
-        padding-top: 1.5rem;
-        border-top: 1px solid var(--medium-blue-slate);
-    }
-
-    .event-description-label {
-        color: var(--text-light);
-        font-weight: 500;
-        margin-bottom: 0.75rem;
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-    }
-
-    .event-description-label i {
-        color: var(--periwinkle);
-        width: 16px;
-    }
-
-    .event-description-content {
-        color: var(--text-muted);
-        line-height: 1.6;
-    }
-
+    /* Mobile Responsive Styles */
     @media (max-width: 768px) {
         .home-container {
             padding: 0 1rem;
@@ -631,38 +523,17 @@
             width: 85%;
         }
 
-        .event-item {
+        .form-row {
             flex-direction: column;
-            align-items: center;
-            text-align: center;
-            gap: 1.5rem;
+            gap: 1rem;
         }
 
-        .event-date {
-            width: 100px;
-            height: 100px;
+        .form-actions {
+            flex-direction: column;
         }
 
-        .event-details {
+        .action-btn {
             width: 100%;
-        }
-
-        .event-attribute {
-            flex-direction: column;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .event-attribute-label {
-            min-width: auto;
-            justify-content: center;
-        }
-
-        .event-attribute-value {
-            justify-content: center;
-        }
-
-        .event-description-label {
             justify-content: center;
         }
 
@@ -698,17 +569,11 @@
         }
     }
 
+    /* Drag and Drop Styles */
     .movable-groups.drag-over {
         background: rgba(72, 72, 102, 0.95);
         border: 2px dashed var(--periwinkle);
         transform: scale(1.02);
-        transition: all 0.2s ease;
-    }
-
-    .movable-group {
-        touch-action: none;
-        user-select: none;
-        -webkit-user-select: none;
         transition: all 0.2s ease;
     }
 
@@ -725,9 +590,6 @@
         pointer-events: none;
         opacity: 0.8;
         transform: scale(1.05);
-        pointer-events: none;
-        transform: translateZ(0); /* Force GPU acceleration */
-        will-change: transform; /* Optimize for animations */
     }
 
     .movable-groups::before {

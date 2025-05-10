@@ -9,7 +9,7 @@ from django.contrib.auth import login as auth_login
 from django.shortcuts import render, redirect, get_object_or_404
 from .forms import SignInForm, CreateAccountForm, CreateOrganizationForm, CreateGroupForm, CreateEventForm, JoinOrganizationForm, CreateGeofenceForm
 from django.views.decorators.csrf import csrf_exempt
-from .models import Organization, Event, UserGroups, EventGroups, UserOrganization, Group, User, EventCheckIn, EventAttendance
+from .models import Organization, Event, UserGroups, EventGroups, UserOrganization, Group, User, EventCheckIn, EventAttendance, Announcement, AnnouncementFile
 from django.http import Http404
 from django.conf import settings
 from django.views.decorators.http import require_POST
@@ -17,6 +17,8 @@ from django.utils import timezone
 import math
 from django.db.models import Q
 import pytz
+from django.core.paginator import Paginator
+from django.core.exceptions import PermissionDenied
 
 
 
@@ -70,7 +72,7 @@ def home(request):
                 is_within_radius=True
             ).exists()
             # Get attending groups for the event
-            event.attending_groups = [event_group.group.name for event_group in event.groups.all()]
+            event.attending_groups = [{'name': event_group.group.name, 'color': event_group.group.color} for event_group in event.groups.all()]
             
             # Calculate time display
             if minutes_until >= 1440:  # More than 24 hours
@@ -99,11 +101,18 @@ def home(request):
         user_organizations__user=request.user
     ).exclude(owner=request.user).prefetch_related('groups')
 
+    # Get all announcements from organizations the user has access to
+    announcements = Announcement.objects.filter(
+        organization__in=list(owned_organizations) + list(member_organizations),
+        is_active=True
+    ).select_related('created_by', 'organization').prefetch_related('files').order_by('-created_at')[:5]
+
     context = {
         'upcoming_events': upcoming_events,
         'user_groups': user_groups,
         'owned_organizations': owned_organizations,
         'member_organizations': member_organizations,
+        'announcements': announcements,
     }
     return render(request, 'home.html', context)
 
@@ -473,7 +482,7 @@ def view_events(request):
                 is_within_radius=True
             ).exists()
             # Get attending groups for the event
-            event.attending_groups = [event_group.group.name for event_group in event.groups.all()]
+            event.attending_groups = [{'name': event_group.group.name, 'color': event_group.group.color} for event_group in event.groups.all()]
             
             # Calculate time display
             if minutes_until >= 1440:  # More than 24 hours
@@ -547,13 +556,15 @@ def view_past_events(request):
         if minutes_until <= 0:
             event.minutes_until = minutes_until
             # Get attending groups for the event
-            event.attending_groups = [event_group.group.name for event_group in event.groups.all()]
+            event.attending_groups = [{'name': event_group.group.name, 'color': event_group.group.color} for event_group in event.groups.all()]
             # Check if user has already checked in
             event.user_check_in = EventCheckIn.objects.filter(
                 user=request.user,
                 event=event,
                 is_within_radius=True
             ).exists()
+            # Check if user's groups are attending this event
+            event.user_can_attend = any(group in user_groups for group in event.groups.values_list('group', flat=True))
             past_events.append(event)
 
     context = {
@@ -1039,10 +1050,250 @@ def event_checkin_page(request, event_id):
     ).exists()
     
     # Get attending groups for the event
-    event.attending_groups = [event_group.group.name for event_group in event.groups.all()]
+    event.attending_groups = [{'name': event_group.group.name, 'color': event_group.group.color} for event_group in event.groups.all()]
     
     context = {
         'event': event,
     }
     
     return render(request, 'event_checkin.html', context)
+
+# TODO: AWS S3 Implementation Considerations
+# 1. Update file upload handling to work with S3:
+#    - Consider using pre-signed URLs for direct uploads
+#    - Implement proper error handling for S3 operations
+#    - Add file size and type validation
+#
+# 2. Update file download handling:
+#    - Generate signed URLs for secure file access
+#    - Implement proper error handling for S3 operations
+#    - Consider implementing file streaming for large files
+#
+# 3. Security considerations:
+#    - Implement proper access controls
+#    - Set up bucket policies
+#    - Consider implementing file encryption
+#    - Add rate limiting for file operations
+#
+# 4. Performance optimizations:
+#    - Consider implementing caching
+#    - Add CDN integration if needed
+#    - Implement file compression if needed
+
+@login_required
+@require_POST
+def create_announcement(request, org_id):
+    try:
+        # Get the organization and verify ownership
+        organization = get_object_or_404(Organization, id=org_id)
+        if organization.owner != request.user:
+            return JsonResponse({'error': 'You do not have permission to create announcements'}, status=403)
+
+        # Get data from request
+        data = request.POST
+        files = request.FILES.getlist('files')
+
+        # Create the announcement
+        announcement = Announcement.objects.create(
+            organization=organization,
+            title=data.get('title'),
+            content=data.get('content'),
+            created_by=request.user,
+            is_active=True
+        )
+
+        # Handle file uploads
+        for file in files:
+            AnnouncementFile.objects.create(
+                announcement=announcement,
+                file=file,
+                filename=file.name
+            )
+
+        return JsonResponse({'success': True})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+@login_required
+def get_announcements(request, org_id):
+    try:
+        # Get the organization
+        organization = get_object_or_404(Organization, id=org_id)
+        
+        # Verify user is a member or owner of the organization
+        if not (organization.owner == request.user or UserOrganization.objects.filter(user=request.user, organization=organization).exists()):
+            return JsonResponse({'error': 'You do not have permission to view announcements'}, status=403)
+
+        # Get page number from query params
+        page = int(request.GET.get('page', 1))
+        per_page = 10
+        start = (page - 1) * per_page
+        end = start + per_page
+
+        # Get announcements
+        announcements = organization.announcements.filter(
+            is_active=True
+        ).select_related('created_by').prefetch_related('files')[start:end]
+
+        # Format announcements for JSON response
+        announcements_data = []
+        for announcement in announcements:
+            files_data = [{
+                'url': file.file.url,
+                'filename': file.filename
+            } for file in announcement.files.all()]
+
+            announcements_data.append({
+                'id': announcement.id,
+                'title': announcement.title,
+                'content': announcement.content,
+                'created_at': announcement.created_at.strftime('%b %d, %Y'),
+                'created_by': announcement.created_by.get_full_name() or announcement.created_by.username,
+                'files': files_data
+            })
+
+        return JsonResponse({'announcements': announcements_data})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+@login_required
+@require_POST
+def delete_announcement(request, announcement_id):
+    try:
+        # Get the announcement
+        announcement = get_object_or_404(Announcement, id=announcement_id)
+        
+        # Verify ownership
+        if announcement.organization.owner != request.user:
+            return JsonResponse({'error': 'You do not have permission to delete this announcement'}, status=403)
+
+        # Soft delete by marking as inactive
+        announcement.is_active = False
+        announcement.save()
+
+        return JsonResponse({'success': True})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+@login_required
+def view_announcements(request):
+    # Get organizations where user is either owner or member
+    owned_organizations = Organization.objects.filter(owner=request.user)
+    member_organizations = Organization.objects.filter(
+        user_organizations__user=request.user
+    ).exclude(owner=request.user)
+
+    # Combine both querysets
+    organizations = list(owned_organizations) + list(member_organizations)
+
+    # Get all announcements from all organizations the user has access to
+    announcements = Announcement.objects.filter(
+        organization__in=organizations,
+        is_active=True
+    ).select_related('created_by', 'organization').prefetch_related('files').order_by('-created_at')
+
+    context = {
+        'organizations': organizations,  # Keep this for the create announcement dropdown
+        'announcements': announcements,
+    }
+    return render(request, 'viewannouncements.html', context)
+
+@login_required
+@require_POST
+def edit_announcement(request, announcement_id):
+    try:
+        # Get the announcement and verify ownership
+        announcement = get_object_or_404(Announcement, id=announcement_id)
+        if announcement.organization.owner != request.user:
+            return JsonResponse({'error': 'You do not have permission to edit this announcement'}, status=403)
+
+        # Get data from request
+        data = request.POST
+        files = request.FILES.getlist('files')
+        files_to_remove = request.POST.getlist('files_to_remove')
+
+        # Update announcement details
+        announcement.title = data.get('title')
+        announcement.content = data.get('content')
+        announcement.save()
+
+        # Remove selected files
+        if files_to_remove:
+            AnnouncementFile.objects.filter(id__in=files_to_remove).delete()
+
+        # Add new files
+        for file in files:
+            AnnouncementFile.objects.create(
+                announcement=announcement,
+                file=file,
+                filename=file.name
+            )
+
+        return JsonResponse({'success': True})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+@login_required
+def get_announcement_files(request, announcement_id):
+    try:
+        # Get the announcement and verify access
+        announcement = get_object_or_404(Announcement, id=announcement_id)
+        if not (announcement.organization.owner == request.user or 
+                UserOrganization.objects.filter(user=request.user, organization=announcement.organization).exists()):
+            return JsonResponse({'error': 'You do not have permission to view these files'}, status=403)
+
+        # Get files
+        files = announcement.files.all()
+        files_data = [{
+            'id': file.id,
+            'filename': file.filename,
+            'url': file.file.url
+        } for file in files]
+
+        return JsonResponse({'files': files_data})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+@login_required
+def get_announcement_details(request, announcement_id):
+    try:
+        announcement = Announcement.objects.get(id=announcement_id)
+        # Check if user has access to this announcement
+        if not (announcement.organization.owner == request.user or request.user in announcement.organization.members.all()):
+            return JsonResponse({'error': 'You do not have permission to access this announcement'}, status=403)
+        
+        return JsonResponse({
+            'title': announcement.title,
+            'content': announcement.content,
+            'organization_id': announcement.organization.id
+        })
+    except Announcement.DoesNotExist:
+        return JsonResponse({'error': 'Announcement not found'}, status=404)
+
+@login_required
+def update_group_color(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            group_id = data.get('groupId')
+            color = data.get('color')
+            
+            if not group_id or not color:
+                return JsonResponse({'success': False, 'error': 'Missing required fields'})
+            
+            group = Group.objects.get(id=group_id)
+            
+            # Verify user has permission to edit this group
+            if group.organization.owner != request.user:
+                return JsonResponse({'success': False, 'error': 'Permission denied'})
+            
+            group.color = color
+            group.save()
+            
+            return JsonResponse({'success': True})
+        except Group.DoesNotExist:
+            return JsonResponse({'success': False, 'error': 'Group not found'})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    
+    return JsonResponse({'success': False, 'error': 'Invalid request method'})

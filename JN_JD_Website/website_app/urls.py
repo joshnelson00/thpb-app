@@ -35,6 +35,15 @@ urlpatterns = [
     path('settings/', views.settings, name='settings'),
     path('help/', views.help_support, name='help'),
     
+    # Announcement URLs
+    path('announcements/', views.view_announcements, name='view_announcements'),
+    path('organization/<int:org_id>/create-announcement/', views.create_announcement, name='create_announcement'),
+    path('organization/<int:org_id>/announcements/', views.get_announcements, name='get_announcements'),
+    path('announcement/<int:announcement_id>/delete/', views.delete_announcement, name='delete_announcement'),
+    path('announcement/<int:announcement_id>/edit/', views.edit_announcement, name='edit_announcement'),
+    path('announcement/<int:announcement_id>/files/', views.get_announcement_files, name='get_announcement_files'),
+    path('announcement/<int:announcement_id>/details/', views.get_announcement_details, name='get_announcement_details'),
+    
     # Password Reset URLs
     path('password_reset/', auth_views.PasswordResetView.as_view(
         template_name='password_reset.html',
@@ -50,4 +59,5 @@ urlpatterns = [
     path('reset/done/', auth_views.PasswordResetCompleteView.as_view(
         template_name='password_reset_complete.html'
     ), name='password_reset_complete'),
+    path('update-group-color/', views.update_group_color, name='update_group_color'),
 ]

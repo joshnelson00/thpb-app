@@ -47,9 +47,12 @@
                     </div>
                     <div class="group-info">
                         <span class="member-count">{{ users_in_groups|get_item:group.id|length }} members</span>
-                        <button class="edit-name-btn" data-group-id="{{ group.id }}" title="Edit group name">
-                            <i class="fas fa-edit"></i>
-                        </button>
+                        <div class="group-actions">
+                            <input type="color" class="color-picker" data-group-id="{{ group.id }}" value="{{ group.color }}" title="Change group color">
+                            <button class="edit-name-btn" data-group-id="{{ group.id }}" title="Edit group name">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -453,6 +456,47 @@ $(document).ready(function() {
             window.location.href = "{% url 'delete_organization' organization.id %}";
         }
     };
+
+    // Add color picker functionality
+    $('.color-picker').on('change', function() {
+        const groupId = $(this).data('group-id');
+        const newColor = $(this).val();
+        
+        $.ajax({
+            url: '/update-group-color/',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({
+                groupId: groupId,
+                color: newColor
+            }),
+            headers: {
+                'X-CSRFToken': csrftoken
+            },
+            success: function(response) {
+                if (response.success) {
+                    // Update the group card styling
+                    const groupCard = $(`.group-card:has(.group-name[data-group-id="${groupId}"])`);
+                    groupCard.css('border-color', newColor);
+                    
+                    // Update all movable groups in this group
+                    $(`.group-users[data-group-id="${groupId}"] .movable-group`).css('border-color', newColor);
+                    
+                    // Add success animation
+                    groupCard.addClass('color-update-success');
+                    setTimeout(() => {
+                        groupCard.removeClass('color-update-success');
+                    }, 500);
+                } else {
+                    alert('Error updating group color: ' + response.error);
+                }
+            },
+            error: function(error) {
+                console.error('Error:', error);
+                alert('Error updating group color');
+            }
+        });
+    });
 });
 </script>
 
@@ -580,7 +624,7 @@ $(document).ready(function() {
         border-radius: 12px;
         padding: 1.25rem;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-        border: 1px solid var(--medium-blue-slate);
+        border: 1px solid var(--group-color, var(--medium-blue-slate));
         backdrop-filter: blur(8px);
         -webkit-backdrop-filter: blur(8px);
         transition: transform 0.3s ease, box-shadow 0.3s ease;
@@ -664,20 +708,35 @@ $(document).ready(function() {
         font-size: 0.8rem;
     }
 
-    .group-actions button {
-        background: none;
-        border: none;
-        color: var(--periwinkle);
-        cursor: pointer;
-        padding: 0.5rem;
-        border-radius: 6px;
-        transition: all 0.3s ease;
+    .group-actions {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
     }
 
-    .group-actions button:hover {
-        background-color: rgba(184, 186, 255, 0.1);
-        color: var(--text-light);
-        transform: scale(1.1);
+    .color-picker {
+        -webkit-appearance: none;
+        width: 24px;
+        height: 24px;
+        padding: 0;
+        border: 1px solid var(--medium-blue-slate);
+        border-radius: 6px;
+        cursor: pointer;
+        background: none;
+    }
+
+    .color-picker::-webkit-color-swatch-wrapper {
+        padding: 0;
+    }
+
+    .color-picker::-webkit-color-swatch {
+        border: none;
+        border-radius: 4px;
+    }
+
+    .color-picker:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
     }
 
     .group-members {
@@ -705,7 +764,7 @@ $(document).ready(function() {
         height: 32px;
         overflow: hidden;
         text-overflow: ellipsis;
-        border: 1px solid rgba(255, 255, 255, 0.1);
+        border: 1px solid var(--group-color, rgba(255, 255, 255, 0.1));
         justify-content: flex-start;
         box-sizing: border-box;
     }
@@ -1064,6 +1123,22 @@ $(document).ready(function() {
     /* Ensure smooth transitions */
     .movable-groups {
         transition: all 0.2s ease;
+    }
+
+    .color-update-success {
+        animation: colorUpdateSuccess 0.5s ease-out;
+    }
+
+    @keyframes colorUpdateSuccess {
+        0% {
+            transform: scale(1.02);
+        }
+        50% {
+            transform: scale(1.01);
+        }
+        100% {
+            transform: scale(1);
+        }
     }
 </style>
 

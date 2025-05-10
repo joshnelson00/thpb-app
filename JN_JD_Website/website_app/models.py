@@ -85,6 +85,7 @@ class Group(models.Model):
     date_created = models.DateField(auto_now_add=True)
     organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='groups')
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='owned_groups')
+    color = models.CharField(max_length=7, default='#6666ff')  # Default to medium-blue-slate
 
     class Meta:
         db_table = 'Group'
@@ -164,3 +165,50 @@ class EventAttendance(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - {self.event.name} - {'Attended' if self.is_attending else 'Not Attended'}"
+
+class Announcement(models.Model):
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='announcements')
+    title = models.CharField(max_length=255)
+    content = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='created_announcements')
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = 'Announcement'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.organization.name} - {self.title}"
+
+# TODO: AWS S3 Implementation Steps
+# 1. Install required packages:
+#    pip install django-storages boto3
+#
+# 2. Update settings.py with AWS configuration:
+#    INSTALLED_APPS += ['storages']
+#    AWS_ACCESS_KEY_ID = 'your-access-key'
+#    AWS_SECRET_ACCESS_KEY = 'your-secret-key'
+#    AWS_STORAGE_BUCKET_NAME = 'your-bucket-name'
+#    AWS_S3_REGION_NAME = 'your-region'
+#    AWS_DEFAULT_ACL = 'private'
+#    AWS_S3_CUSTOM_DOMAIN = f'{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com'
+#    AWS_S3_OBJECT_PARAMETERS = {'CacheControl': 'max-age=86400'}
+#
+# 3. Create custom storage class for announcement files
+# 4. Update file field to use S3 storage
+# 5. Set up proper IAM roles and bucket policies
+# 6. Configure CORS if needed for direct uploads
+# 7. Consider implementing signed URLs for secure file access
+
+class AnnouncementFile(models.Model):
+    announcement = models.ForeignKey(Announcement, on_delete=models.CASCADE, related_name='files')
+    file = models.FileField(upload_to='announcement_files/')
+    filename = models.CharField(max_length=255)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'AnnouncementFile'
+
+    def __str__(self):
+        return self.filename
