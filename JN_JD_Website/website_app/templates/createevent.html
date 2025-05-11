@@ -39,26 +39,28 @@
                         {% endif %}
                     </div>
                     
-                    <div class="form-group">
-                        <div class="form-label">
-                            <i class="fas fa-calendar" style="color: var(--white);"></i>
-                            Date
+                    <div class="form-group date-time-container">
+                        <div class="date-time-group">
+                            <div class="form-label">
+                                <i class="fas fa-calendar" style="color: var(--white);"></i>
+                                Date
+                            </div>
+                            {{ form.date }}
+                            {% if form.date.errors %}
+                            <div class="error">{{ form.date.errors }}</div>
+                            {% endif %}
                         </div>
-                        {{ form.date }}
-                        {% if form.date.errors %}
-                        <div class="error">{{ form.date.errors }}</div>
-                        {% endif %}
-                    </div>
-                    
-                    <div class="form-group">
-                        <div class="form-label">
-                            <i class="fas fa-clock" style="color: var(--white);"></i>
-                            Time
+                        
+                        <div class="date-time-group">
+                            <div class="form-label">
+                                <i class="fas fa-clock" style="color: var(--white);"></i>
+                                Time
+                            </div>
+                            {{ form.time }}
+                            {% if form.time.errors %}
+                            <div class="error">{{ form.time.errors }}</div>
+                            {% endif %}
                         </div>
-                        {{ form.time }}
-                        {% if form.time.errors %}
-                        <div class="error">{{ form.time.errors }}</div>
-                        {% endif %}
                     </div>
                     
                     <div class="form-group">
@@ -632,6 +634,25 @@ document.addEventListener('DOMContentLoaded', function() {
         white-space: nowrap;
     }
 
+    .date-time-container {
+        display: flex;
+        gap: 1rem;
+        max-width: 600px;
+        margin: 1.5rem auto;
+    }
+
+    .date-time-group {
+        flex: 1;
+    }
+
+    .date-time-group .form-group {
+        margin: 0;
+    }
+
+    .date-time-group input {
+        width: 100%;
+    }
+
     @media (max-width: 768px) {
         .home-container {
             padding: 0 1rem;
@@ -656,6 +677,31 @@ document.addEventListener('DOMContentLoaded', function() {
         #radiusValue {
             text-align: center;
         }
+
+        .date-time-container {
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+    }
+
+    /* Make input icons white */
+    input[type="date"]::-webkit-calendar-picker-indicator,
+    input[type="time"]::-webkit-calendar-picker-indicator {
+        filter: invert(1);
+        opacity: 0.8;
+    }
+
+    input[type="date"]::-webkit-inner-spin-button,
+    input[type="time"]::-webkit-inner-spin-button {
+        filter: invert(1);
+        opacity: 0.8;
+    }
+
+    /* For Firefox */
+    input[type="date"]::-moz-calendar-picker-indicator,
+    input[type="time"]::-moz-calendar-picker-indicator {
+        filter: invert(1);
+        opacity: 0.8;
     }
 </style>
 {% endblock %}

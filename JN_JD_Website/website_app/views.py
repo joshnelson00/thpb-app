@@ -1003,12 +1003,9 @@ def event_attendance(request, event_id):
         messages.error(request, "You don't have permission to view this event's attendance.")
         return redirect('home')
     
-    # Get all groups assigned to this event through EventGroups
-    event_groups = Group.objects.filter(events__event=event)
-    
-    # Get all users who should attend (from groups assigned to the event)
+    # Get all users who are expected to attend (from EventAttendees)
     expected_attendees = User.objects.filter(
-        membership_groups__group__in=event_groups
+        attending_events__event=event
     ).exclude(id=event.owner.id).distinct()  # Exclude the event owner
     
     # Get all check-ins for this event

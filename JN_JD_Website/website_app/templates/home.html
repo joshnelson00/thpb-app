@@ -142,7 +142,7 @@
                                             {% for file in announcement.files.all %}
                                                 <a href="{{ file.file.url }}" class="file-link" target="_blank">
                                                     <i class="fas fa-file"></i>
-                                                    <span class="file-name">{{ file.file.name|slice:"7:" }}</span>
+                                                    <span class="file-name">{{ file.filename }}</span>
                                                 </a>
                                             {% endfor %}
                                         </div>
