@@ -9,7 +9,7 @@ from django.contrib.auth import login as auth_login
 from django.shortcuts import render, redirect, get_object_or_404
 from .forms import SignInForm, CreateAccountForm, CreateOrganizationForm, CreateGroupForm, CreateEventForm, JoinOrganizationForm, CreateGeofenceForm
 from django.views.decorators.csrf import csrf_exempt
-from .models import Organization, Event, UserGroups, EventGroups, UserOrganization, Group, User, EventCheckIn, EventAttendance, Announcement, AnnouncementFile
+from .models import Organization, Event, UserGroups, EventGroups, UserOrganization, Group, User, EventCheckIn, EventAttendance, Announcement, AnnouncementFile, EventAttendees
 from django.http import Http404
 from django.conf import settings
 from django.views.decorators.http import require_POST
@@ -71,8 +71,21 @@ def home(request):
                 event=event,
                 is_within_radius=True
             ).exists()
-            # Get attending groups for the event
-            event.attending_groups = [{'name': event_group.group.name, 'color': event_group.group.color} for event_group in event.groups.all()]
+            # Get attending groups for the event - include both initially assigned groups and groups from attendees
+            event.attending_groups = []
+            # Add initially assigned groups
+            for event_group in event.groups.all():
+                event.attending_groups.append({
+                    'name': event_group.group.name,
+                    'color': event_group.group.color
+                })
+            # Add groups from attendees that aren't already included
+            for attendee in event.attendees.all():
+                if attendee.group and not any(g['name'] == attendee.group.name for g in event.attending_groups):
+                    event.attending_groups.append({
+                        'name': attendee.group.name,
+                        'color': attendee.group.color
+                    })
             
             # Calculate time display
             if minutes_until >= 1440:  # More than 24 hours
@@ -396,30 +409,74 @@ def edit_event(request, event_id):
     event = get_object_or_404(Event, id=event_id, owner=request.user)
     
     if request.method == 'POST':
-        form = CreateEventForm(request.POST, user=request.user, instance=event)
+        # Create a mutable copy of the POST data
+        data = request.POST.copy()
+        
+        # Ensure required fields are present
+        if not all(key in data for key in ['name', 'date', 'time', 'location', 'description', 'organization', 'latitude', 'longitude', 'radius']):
+            return JsonResponse({'success': False, 'error': 'Missing required fields'})
+        
+        # Create form with the data
+        form = CreateEventForm(data, user=request.user, instance=event)
+        
         if form.is_valid():
             event = form.save(commit=False)
+            # Preserve the original organization and owner
+            event.organization = Organization.objects.get(id=data['organization'])
+            event.owner = request.user
             event.save()
             
-            return redirect('viewevents')  # Redirect to the view events page
+            # Handle groups and update attendees
+            new_groups = set(form.cleaned_data.get('groups', []))
+            
+            # Get all users from the new groups
+            new_group_users = User.objects.filter(
+                membership_groups__group__in=new_groups
+            ).distinct()
+            
+            # Add all users from new groups as attendees
+            for user in new_group_users:
+                EventAttendees.objects.get_or_create(
+                    event=event,
+                    user=user
+                )
+            
+            return JsonResponse({'success': True, 'message': 'Event updated successfully'})
+        else:
+            # Return form errors
+            return JsonResponse({
+                'success': False, 
+                'error': 'Invalid form data',
+                'form_errors': form.errors
+            })
     else:
         form = CreateEventForm(user=request.user, instance=event)
 
-    # Get all groups from the event's organization
-    available_groups = Group.objects.filter(organization=event.organization).exclude(
-        id__in=EventGroups.objects.filter(event=event).values_list('group_id', flat=True)
-    )
+    # Get all users from the event's organization
+    org_users = User.objects.filter(
+        user_organizations__organization=event.organization
+    ).distinct()
     
-    # Get groups already assigned to the event using EventGroups
-    assigned_groups = Group.objects.filter(
-        id__in=EventGroups.objects.filter(event=event).values_list('group_id', flat=True)
-    )
+    # Split users into attending and available
+    attending_users = []
+    available_users = []
+    for user in org_users:
+        is_attending = EventAttendees.objects.filter(event=event, user=user).exists()
+        user_info = {
+            'id': user.id,
+            'name': f"{user.f_name} {user.l_name}",
+            'is_attending': is_attending
+        }
+        if is_attending:
+            attending_users.append(user_info)
+        else:
+            available_users.append(user_info)
 
     context = {
         'form': form,
         'event': event,
-        'available_groups': available_groups,
-        'assigned_groups': assigned_groups
+        'attending_users': attending_users,
+        'available_users': available_users,
     }
 
     return render(request, 'editevent.html', context)
@@ -437,7 +494,7 @@ def view_events(request):
     
     # Base query for events
     events_query = Event.objects.filter(
-        Q(groups__group__in=user_groups) |  # Events where user's groups are attending
+        Q(attendees__user=request.user) |  # Events where user is an attendee
         Q(organization__in=organizations)  # Events from organizations user owns or is a member of
     ).distinct()
     
@@ -497,8 +554,8 @@ def view_events(request):
             else:
                 event.time_display = f"{minutes_until}m"
             
-            # Check if user's groups are attending this event
-            event.user_can_attend = any(group in user_groups for group in event.groups.values_list('group', flat=True))
+            # Check if user is attending this event
+            event.user_can_attend = EventAttendees.objects.filter(event=event, user=request.user).exists()
             
             upcoming_events.append(event)
 
@@ -521,7 +578,7 @@ def view_past_events(request):
     
     # Base query for events
     events_query = Event.objects.filter(
-        Q(groups__group__in=user_groups) |  # Events where user's groups are attending
+        Q(attendees__user=request.user) |  # Events where user is an attendee
         Q(organization__in=organizations)  # Events from organizations user owns or is a member of
     ).distinct()
     
@@ -563,8 +620,8 @@ def view_past_events(request):
                 event=event,
                 is_within_radius=True
             ).exists()
-            # Check if user's groups are attending this event
-            event.user_can_attend = any(group in user_groups for group in event.groups.values_list('group', flat=True))
+            # Check if user is attending this event
+            event.user_can_attend = EventAttendees.objects.filter(event=event, user=request.user).exists()
             past_events.append(event)
 
     context = {
@@ -666,10 +723,29 @@ def create_event(request):
             event.timezone = request.POST.get('timezone', 'America/New_York')
             event.save()
             
-            # Handle groups
+            # Save the groups to EventGroups
             groups = form.cleaned_data.get('groups', [])
             for group in groups:
-                EventGroups.objects.create(event=event, group=group)
+                EventGroups.objects.create(group=group, event=event)
+            
+            # Always add the organization owner as an attendee
+            organization = form.cleaned_data.get('organization')
+            if organization and organization.owner:
+                EventAttendees.objects.get_or_create(
+                    event=event,
+                    user=organization.owner
+                )
+            
+            # Handle groups and add their users as attendees
+            for group in groups:
+                # Add all users from the group as attendees
+                group_users = UserGroups.objects.filter(group=group)
+                for user_group in group_users:
+                    EventAttendees.objects.get_or_create(
+                        event=event,
+                        user=user_group.user,
+                        group=group  # Store the group reference
+                    )
             
             messages.success(request, 'Event created successfully!')
             return redirect('viewevents')
@@ -722,38 +798,29 @@ def join_org(request):
 @login_required
 def update_event_group(request):
     try:
-        # Try to handle both JSON and form data
-        if request.content_type == 'application/json':
-            try:
-                data = json.loads(request.body)
-            except json.JSONDecodeError:
-                print("JSON decode error")
-                return JsonResponse({"success": False, "error": "Invalid JSON data"}, status=400)
-        else:
-            data = request.POST
+        data = json.loads(request.body)
+        group_id = data.get('group_id')
+        event_id = data.get('event_id')
+        action = data.get('action')
 
-        group_id = data.get("group_id")
-        event_id = data.get("event_id")
-        action = data.get("action")
+        if not all([group_id, event_id, action]):
+            return JsonResponse({"success": False, "error": "Missing required parameters"}, status=400)
 
-        # Validate required fields
-        if not group_id or not group_id.isdigit():
-            return JsonResponse({"success": False, "error": "Invalid group ID"}, status=400)
-        if not event_id or not event_id.isdigit():
-            return JsonResponse({"success": False, "error": "Invalid event ID"}, status=400)
-        if not action:
-            return JsonResponse({"success": False, "error": "Action is required"}, status=400)
-
-        group = get_object_or_404(Group, id=int(group_id))
-        event = get_object_or_404(Event, id=int(event_id))
-
-        # Ensure the user has permission to modify this event
-        if event.owner != request.user:
-            return JsonResponse({"success": False, "error": "You don't have permission to modify this event"}, status=403)
+        # Get the event and verify ownership
+        event = get_object_or_404(Event, id=event_id, owner=request.user)
+        group = get_object_or_404(Group, id=group_id)
 
         if action == "add":
             # Add group to event
             EventGroups.objects.get_or_create(group=group, event=event)
+            # Add all users from the group as attendees
+            group_users = UserGroups.objects.filter(group=group)
+            for user_group in group_users:
+                EventAttendees.objects.get_or_create(
+                    event=event,
+                    user=user_group.user,
+                    group=group
+                )
             return JsonResponse({
                 "success": True,
                 "message": f"Group {group.name} added to event {event.name}"
@@ -761,6 +828,8 @@ def update_event_group(request):
         elif action == "remove":
             # Remove group from event
             EventGroups.objects.filter(group=group, event=event).delete()
+            # Remove attendees from the removed group
+            EventAttendees.objects.filter(event=event, group=group).delete()
             return JsonResponse({
                 "success": True,
                 "message": f"Group {group.name} removed from event {event.name}"
@@ -1297,3 +1366,38 @@ def update_group_color(request):
             return JsonResponse({'success': False, 'error': str(e)})
     
     return JsonResponse({'success': False, 'error': 'Invalid request method'})
+
+@login_required
+def update_event_attendee(request):
+    try:
+        data = json.loads(request.body)
+        user_id = data.get('user_id')
+        event_id = data.get('event_id')
+        action = data.get('action')
+
+        if not all([user_id, event_id, action]):
+            return JsonResponse({"success": False, "error": "Missing required parameters"}, status=400)
+
+        event = get_object_or_404(Event, id=event_id, owner=request.user)
+        user = get_object_or_404(User, id=user_id)
+
+        if action == "add":
+            # Add user to attendees
+            EventAttendees.objects.get_or_create(event=event, user=user)
+            return JsonResponse({
+                "success": True,
+                "message": f"User {user.f_name} {user.l_name} added to event {event.name}"
+            })
+        elif action == "remove":
+            # Remove user from attendees
+            EventAttendees.objects.filter(event=event, user=user).delete()
+            return JsonResponse({
+                "success": True,
+                "message": f"User {user.f_name} {user.l_name} removed from event {event.name}"
+            })
+        else:
+            return JsonResponse({"success": False, "error": "Invalid action"}, status=400)
+
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+        return JsonResponse({"success": False, "error": str(e)}, status=500)

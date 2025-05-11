@@ -698,59 +698,103 @@ footer {
 /* Responsive Design */
 @media (max-width: 768px) {
 	.footer-content {
-		display: grid;
-		grid-template-columns: repeat(2, 1fr); /* Keep two columns */
-		gap: 1rem;
-		text-align: center;
+		flex-direction: column;
+		gap: 1.5rem;
 	}
 
 	.footer-links ul,
 	.footer-social ul {
-		flex-direction: column;
-		align-items: center;
-		gap: 0.75rem; /* Adjust spacing */
-	}
-
-	.footer-links,				
-	.footer-social {
-		width: 100%;
-		display: flex;
 		justify-content: center;
 	}
-	.mobile-ad-container {
-        display: block; /* Show on mobile devices */
-    }
 
-	.signin-form > .textbox {
-		display: block;
-		width: 60vw;
+	.content {
+		padding: 1rem;
+		margin: 1rem;
+		width: calc(100% - 2rem);
 	}
-	
+
+	.form input {
+		padding: 0.75rem;
+	}
+
+	.event-description-container ul li {
+		padding: 0.5rem;
+	}
+}
+
+@media (max-width: 578px) {
+	.content {
+		padding: 0.75rem;
+		margin: 0.5rem;
+		width: calc(100% - 1rem);
+	}
+
+	.form {
+		padding: 1rem;
+	}
+
+	.form input {
+		padding: 0.6rem;
+		font-size: 0.9rem;
+	}
+
+	.form button {
+		padding: 0.6rem 1rem;
+		font-size: 0.9rem;
+	}
+
 	.event-list-item {
-        background: linear-gradient(to bottom, var(--card-bg) 0%, var(--dark-bg) 100%);
-    }
+		padding: 0.75rem;
+	}
 
-    .event-list-date-block {
-        margin: 0 0 1rem 0;
-    }
+	.event-list-date-block {
+		padding: 0.5rem;
+	}
 
-    .event-description-container {
-        max-width: 100%;
-    }
+	.event-description-container {
+		padding: 0.75rem;
+	}
 
-    .content {
-        width: 95%;
-        padding: 1rem;
-        background: linear-gradient(to bottom, var(--card-bg) 0%, var(--dark-bg) 100%);
-    }
+	.event-description-container h3 {
+		font-size: 1.1rem;
+	}
 
-    .form input {
-        width: 100%;
-    }
+	.event-description-container p {
+		font-size: 0.9rem;
+	}
 
-    .event-description-container ul li {
-        max-width: 150px;
-    }
+	.event-description-container ul li {
+		padding: 0.4rem;
+		font-size: 0.9rem;
+	}
+
+	.group-container-wrapper {
+		padding: 0.75rem;
+	}
+
+	.group-users {
+		padding: 0.5rem;
+	}
+
+	.movable-user {
+		padding: 0.4rem 0.6rem;
+		font-size: 0.9rem;
+	}
+
+	.filter-section select {
+		padding: 0.4rem;
+		font-size: 0.9rem;
+	}
+
+	.check-in-btn {
+		padding: 0.4rem 0.75rem;
+		font-size: 0.9rem;
+	}
+
+	.status-badge {
+		padding: 0.3rem 0.5rem;
+		font-size: 0.8rem;
+	}
 }
 
 .edit-event-link {

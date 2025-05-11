@@ -5,7 +5,7 @@
 <div class="home-container">
     <div class="welcome-section">
         <h1><i class="fas fa-edit"></i> Edit Event: {{ event.name }}</h1>
-        <p class="welcome-message">Modify event details and manage assigned groups.</p>
+        <p class="welcome-message">Modify event details and manage assigned users.</p>
     </div>
 
     <form id="editEventForm" class="dashboard-grid">
@@ -57,35 +57,32 @@
             </div>
         </div>
 
-        <!-- Groups Management Card -->
+        <!-- Users Management Card -->
         <div class="dashboard-card">
             <div class="card-header">
-                <h2><i class="fas fa-users"></i> Manage Groups</h2>
+                <h2><i class="fas fa-users"></i> Manage Users</h2>
             </div>
             <div class="card-content">
-                <div class="groups-management">
-                    <div class="groups-column">
-                        <h3>Available Groups</h3>
-                        <div class="movable-groups" id="available-groups">
-                            {% for group in available_groups %}
-                            <div class="movable-group" id="group{{ group.id }}" draggable="true">
-                                <i class="fas fa-user-friends"></i>
-                                {{ group.name }}
+                <div class="users-management-two-cols">
+                    <div class="user-container available-users" id="available-users">
+                        <h3>Available Users</h3>
+                        <div class="user-list" id="available-list">
+                            {% for user in available_users %}
+                            <div class="user-item not-attending" draggable="true" data-user-id="{{ user.id }}">
+                                <span class="user-name">{{ user.name }}</span>
+                                <span class="attendance-status not-attending"><i class="fas fa-times"></i></span>
                             </div>
                             {% endfor %}
                         </div>
                     </div>
-                
-                    <div class="groups-column">
-                        <h3>Assigned Groups</h3>
-                        <div class="movable-groups" id="assigned-groups">
-                            {% for group in assigned_groups %}
-                                {% if group.name %}
-                                    <div class="movable-group" id="group{{ group.id }}" draggable="true">
-                                        <i class="fas fa-user-friends"></i>
-                                        {{ group.name }}
-                                    </div>
-                                {% endif %}
+                    <div class="user-container attending-users" id="attending-users">
+                        <h3>Attending Users</h3>
+                        <div class="user-list" id="attending-list">
+                            {% for user in attending_users %}
+                            <div class="user-item attending" draggable="true" data-user-id="{{ user.id }}">
+                                <span class="user-name">{{ user.name }}</span>
+                                <span class="attendance-status attending"><i class="fas fa-check"></i></span>
+                            </div>
                             {% endfor %}
                         </div>
                     </div>
@@ -123,7 +120,12 @@
                 date: $('#event-date').val(),
                 time: $('#event-time').val(),
                 location: $('#event-location').val(),
-                description: $('#event-description').val()
+                description: $('#event-description').val(),
+                organization: '{{ event.organization.id }}',  // Add organization ID
+                latitude: '{{ event.geofence_latitude }}',   // Add latitude
+                longitude: '{{ event.geofence_longitude }}', // Add longitude
+                radius: '{{ event.geofence_radius }}',       // Add radius
+                groups: []  // Add empty groups array
             };
 
             $.ajax({
@@ -135,13 +137,14 @@
                 },
                 success: function(response) {
                     if (response.success) {
-                        alert('Event updated successfully');
+                        alert(response.message || 'Event updated successfully');
                         window.location.href = "{% url 'viewevents' %}";
                     } else {
                         alert('Error updating event: ' + (response.error || 'Unknown error occurred'));
                     }
                 },
                 error: function(xhr, status, error) {
+                    console.error('Error:', xhr.responseText);
                     alert('Error updating event: ' + (xhr.responseJSON?.error || 'Unknown error occurred'));
                 }
             });
@@ -179,118 +182,70 @@
             }
         });
 
-        // Existing drag and drop functionality
-        let draggedGroup = null;
-        let touchStartY = 0;
-        let touchStartX = 0;
-        let offsetX = 0;
-        let offsetY = 0;
-        let ghostElement = null;
+        // Drag and drop for users
+        let draggedUser = null;
 
-        // Function to update group counts
-        function updateGroupCounts() {
-            const availableCount = $("#available-groups .movable-group").length;
-            const assignedCount = $("#assigned-groups .movable-group").length;
-            
-            $("#available-groups").attr("data-count", availableCount);
-            $("#assigned-groups").attr("data-count", assignedCount);
-            document.body.offsetHeight;
-        }
-
-        // Make all groups draggable
-        $(".movable-group").attr("draggable", true);
-
-        // Handle drag start
-        $(".movable-group").on("dragstart", function(event) {
-            event.originalEvent.dataTransfer.setData("group_id", $(this).attr("id").replace("group", ""));
-            draggedGroup = $(this);
-            draggedGroup.addClass('dragging');
+        $(document).on('dragstart', '.user-item', function(event) {
+            event.originalEvent.dataTransfer.setData('user_id', $(this).data('user-id'));
+            draggedUser = $(this);
+            $(this).addClass('dragging');
         });
 
-        // Handle drag end
-        $(".movable-group").on("dragend", function() {
+        $(document).on('dragend', '.user-item', function() {
             $(this).removeClass('dragging');
-            $('.movable-groups').removeClass('drag-over');
+            $('.user-list').removeClass('drag-over');
         });
 
-        // Function to handle group movement
-        function moveGroup(groupId, targetContainer, action) {
-            return new Promise((resolve, reject) => {
-                $.ajax({
-                    url: "{% url 'update_event_group' %}",
-                    method: "POST",
-                    contentType: "application/json",
-                    data: JSON.stringify({
-                        group_id: groupId,
-                        event_id: "{{ event.id }}",
-                        action: action
-                    }),
-                    headers: {
-                        "X-CSRFToken": "{{ csrf_token }}"
-                    },
-                    success: function(response) {
-                        if (response.success) {
-                            const $group = $("#group" + groupId).detach();
-                            targetContainer.append($group);
-                            document.body.offsetHeight;
-                            updateGroupCounts();
-                            resolve(response);
-                        } else {
-                            reject(new Error(response.error || 'Unknown error'));
-                        }
-                    },
-                    error: function(xhr, status, error) {
-                        reject(error);
-                    }
-                });
-            });
-        }
-
-        // Handle drag over
-        $(".movable-groups").on("dragover", function(event) {
+        $('.user-list').on('dragover', function(event) {
             event.preventDefault();
             $(this).addClass('drag-over');
         });
 
-        // Handle drag leave
-        $(".movable-groups").on("dragleave", function(event) {
+        $('.user-list').on('dragleave', function(event) {
             $(this).removeClass('drag-over');
         });
 
-        // Handle drop on available groups
-        $("#available-groups").on("drop", function(event) {
+        $('.user-list').on('drop', function(event) {
             event.preventDefault();
-            let group_id = event.originalEvent.dataTransfer.getData("group_id");
+            const user_id = event.originalEvent.dataTransfer.getData('user_id');
+            const $user = $('.user-item[data-user-id="' + user_id + '"]');
+            const isAttending = $(this).attr('id') === 'attending-list';
             
-            moveGroup(group_id, $(this), "remove")
-                .then(function(response) {
-                    document.body.offsetHeight;
-                })
-                .catch(function(error) {
-                    console.error("AJAX Error:", error);
-                });
+            // Toggle attendance via AJAX
+            $.ajax({
+                url: "{% url 'update_event_attendee' %}",
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    user_id: user_id,
+                    event_id: "{{ event.id }}",
+                    action: isAttending ? 'add' : 'remove'
+                }),
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                success: function(response) {
+                    if (response.success) {
+                        if (isAttending) {
+                            $user.appendTo('#attending-list');
+                            $user.removeClass('not-attending').addClass('attending');
+                            $user.find('.attendance-status').removeClass('not-attending').addClass('attending').html('<i class="fas fa-check"></i>');
+                        } else {
+                            $user.appendTo('#available-list');
+                            $user.removeClass('attending').addClass('not-attending');
+                            $user.find('.attendance-status').removeClass('attending').addClass('not-attending').html('<i class="fas fa-times"></i>');
+                        }
+                    } else {
+                        alert('Error updating attendance: ' + (response.error || 'Unknown error'));
+                    }
+                },
+                error: function(xhr, status, error) {
+                    alert('Error updating attendance: ' + (xhr.responseJSON?.error || 'Unknown error'));
+                }
+            });
             
             $(this).removeClass('drag-over');
         });
-
-        // Handle drop on assigned groups
-        $("#assigned-groups").on("drop", function(event) {
-            event.preventDefault();
-            let group_id = event.originalEvent.dataTransfer.getData("group_id");
-            
-            moveGroup(group_id, $(this), "add")
-                .then(function(response) {
-                    document.body.offsetHeight;
-                })
-                .catch(function(error) {
-                    console.error("AJAX Error:", error);
-                });
-            
-            $(this).removeClass('drag-over');
-        });
-
-        // Initialize group counts
-        updateGroupCounts();
     });
 </script>
 
@@ -453,151 +408,165 @@
         transform: translateY(-2px);
     }
 
-    /* Groups Management Styles */
-    .groups-management {
+    /* Users Management Styles */
+    .users-management-two-cols {
         display: flex;
-        gap: 2rem;
-        margin-top: 1rem;
+        gap: 1.5rem;
+        justify-content: space-between;
+        width: 100%;
     }
 
-    .groups-column {
+    .user-container {
         flex: 1;
-    }
-
-    .groups-column h3 {
-        color: var(--text-light);
-        margin-bottom: 1rem;
-        font-size: 1.2rem;
-    }
-
-    .movable-groups {
         background: rgba(26, 26, 46, 0.95);
         border-radius: 12px;
-        padding: 1rem;
-        min-height: 200px;
+        padding: 1.25rem;
         border: 1px solid var(--medium-blue-slate);
-        backdrop-filter: blur(8px);
-        -webkit-backdrop-filter: blur(8px);
-    }
-
-    .movable-group {
-        background: rgba(72, 72, 102, 0.95);
-        color: var(--white);
-        padding: 0.75rem 1rem;
-        margin: 0.5rem 0;
-        border-radius: 8px;
-        cursor: grab;
+        min-width: 0;
         display: flex;
-        align-items: center;
-        gap: 0.75rem;
+        flex-direction: column;
+        align-items: stretch;
         transition: all 0.3s ease;
     }
 
-    .movable-group:hover {
-        background: var(--periwinkle);
-        transform: translateY(-2px);
+    .user-container:hover {
+        border-color: var(--periwinkle);
+        box-shadow: 0 4px 12px rgba(102, 102, 255, 0.1);
     }
 
-    .movable-group i {
-        font-size: 1rem;
+    .user-container h3 {
+        color: var(--text-light);
+        margin-bottom: 1rem;
+        font-size: 1.1rem;
+        border-bottom: 1px solid var(--medium-blue-slate);
+        padding-bottom: 0.5rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .user-container h3::before {
+        content: '';
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--periwinkle);
+    }
+
+    .user-list {
+        min-height: 150px;
+        max-height: 400px;
+        overflow-y: auto;
+        padding: 0.5rem;
+        background: rgba(0, 0, 0, 0.1);
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .user-item {
+        background: rgba(72, 72, 102, 0.95);
+        color: var(--white);
+        padding: 0.5rem 0.75rem;
+        border-radius: 6px;
+        cursor: grab;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        transition: all 0.2s ease;
+        border: 1px solid transparent;
+        font-size: 0.9rem;
+    }
+
+    .user-item.attending {
+        background: rgba(40, 167, 69, 0.15);
+        border: 1px solid rgba(40, 167, 69, 0.3);
+    }
+
+    .user-item.not-attending {
+        background: rgba(220, 53, 69, 0.08);
+        border: 1px solid rgba(220, 53, 69, 0.2);
+    }
+
+    .user-item.dragging {
+        opacity: 0.5;
+        transform: scale(0.98);
+    }
+
+    .user-item:hover {
+        background: var(--periwinkle);
+        color: var(--rich-black);
+        transform: translateY(-1px);
+    }
+
+    .attendance-status {
+        margin-left: auto;
+        font-size: 0.9rem;
+        display: flex;
+        align-items: center;
+        padding: 0.25rem;
+        border-radius: 4px;
+    }
+
+    .attendance-status.attending i {
+        color: #28a745;
+    }
+
+    .attendance-status.not-attending i {
+        color: #dc3545;
+    }
+
+    .user-list.drag-over {
+        background: rgba(102, 102, 255, 0.08);
+        border: 2px dashed var(--periwinkle);
+    }
+
+    /* Mobile Responsive Styles */
+    @media (max-width: 900px) {
+        .users-management-two-cols {
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .user-container {
+            max-width: none;
+        }
     }
 
     .delete-section {
         text-align: center;
         padding: 1rem;
-        background: rgba(26, 26, 46, 0.95);
+        background: rgba(26, 26, 46, 0.85);
         border-radius: 12px;
         border: 1px solid var(--medium-blue-slate);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        position: relative;
+        z-index: 1;
     }
-
     .delete-section p {
         color: var(--text-muted);
-        margin-bottom: 1.5rem;
+        margin-bottom: 2rem;
     }
-
-    /* Mobile Responsive Styles */
-    @media (max-width: 768px) {
-        .home-container {
-            padding: 0 1rem;
-            margin: 1rem auto;
-            width: 85%;
-        }
-
-        .form-row {
-            flex-direction: column;
-            gap: 1rem;
-        }
-
-        .form-actions {
-            flex-direction: column;
-        }
-
-        .action-btn {
-            width: 100%;
-            justify-content: center;
-        }
-
-        .groups-management {
-            flex-direction: column;
-            gap: 1rem;
-        }
-
-        .groups-column h3 {
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            margin-bottom: 0.5rem;
-            font-size: 1rem;
-        }
-
-        .movable-groups {
-            min-height: 80px;
-            max-height: 200px;
-            overflow-y: auto;
-            padding: 0.5rem;
-            margin: 0;
-        }
-
-        .movable-group {
-            padding: 0.5rem 0.75rem;
-            margin: 0.25rem 0;
-            font-size: 0.9rem;
-        }
-
-        .movable-group i {
-            font-size: 0.9rem;
-        }
+    .action-btn.delete {
+        background: #dc3545;
+        color: var(--white);
+        padding: 0.75rem 1.5rem;
+        border-radius: 25px;
+        border: none;
+        cursor: pointer;
+        font-size: 1rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.75rem;
+        transition: all 0.3s ease;
     }
-
-    /* Drag and Drop Styles */
-    .movable-groups.drag-over {
-        background: rgba(72, 72, 102, 0.95);
-        border: 2px dashed var(--periwinkle);
-        transform: scale(1.02);
-        transition: all 0.2s ease;
-    }
-
-    .movable-group.dragging {
-        opacity: 0.5;
-        transform: scale(0.95);
-    }
-
-    .ghost-element {
-        background: rgba(72, 72, 102, 0.95);
-        border: 2px solid var(--periwinkle);
-        border-radius: 8px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-        pointer-events: none;
-        opacity: 0.8;
-        transform: scale(1.05);
-    }
-
-    .movable-groups::before {
-        content: attr(data-count) " groups";
-        display: block;
-        color: var(--text-muted);
-        font-size: 0.9rem;
-        margin-bottom: 0.5rem;
+    .action-btn.delete:hover {
+        background: #c82333;
+        transform: translateY(-2px);
     }
 </style>
 {% endblock %}

@@ -60,4 +60,5 @@ urlpatterns = [
         template_name='password_reset_complete.html'
     ), name='password_reset_complete'),
     path('update-group-color/', views.update_group_color, name='update_group_color'),
+    path('update_event_attendee/', views.update_event_attendee, name='update_event_attendee'),
 ]

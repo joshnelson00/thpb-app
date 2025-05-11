@@ -63,7 +63,7 @@ class Event(models.Model):
     name = models.CharField(max_length=255)
     description = models.TextField()
     date = models.DateField()
-    time = models.TimeField(default=timezone.datetime.min.time())  # Add time field with default midnight
+    time = models.TimeField(default=timezone.datetime.min.time())
     location = models.CharField(max_length=255, default='No location specified')
     organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='events')
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='owned_events')
@@ -73,6 +73,9 @@ class Event(models.Model):
     geofence_radius = models.PositiveIntegerField(null=True, blank=True, help_text="Radius in meters")
     # Timezone field
     timezone = models.CharField(max_length=50, default='America/New_York')
+
+    def get_attending_users(self):
+        return self.attendees.all()
 
     def get_attending_groups(self):
         return self.groups.all()
@@ -212,3 +215,16 @@ class AnnouncementFile(models.Model):
 
     def __str__(self):
         return self.filename
+
+class EventAttendees(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='attending_events')
+    event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='attendees')
+    group = models.ForeignKey(Group, on_delete=models.CASCADE, related_name='event_attendees', null=True)
+    date_added = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'EventAttendees'
+        unique_together = (('user', 'event'),)
+
+    def __str__(self):
+        return f"{self.user.username} - {self.event.name}"
