@@ -228,3 +228,36 @@ class EventAttendees(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - {self.event.name}"
+
+class EventSubstitution(models.Model):
+    event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='substitutions')
+    original_user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='substituted_out')
+    substitute_user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='substituted_in')
+    date_created = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='created_substitutions')
+
+    class Meta:
+        db_table = 'EventSubstitution'
+        unique_together = (('event', 'original_user'),)
+
+    def __str__(self):
+        return f"{self.original_user.get_full_name()} → {self.substitute_user.get_full_name()} for {self.event.name}"
+
+class SubstitutionRequest(models.Model):
+    event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='substitution_requests')
+    requesting_user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='substitution_requests_made')
+    target_user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='substitution_requests_received')
+    status = models.CharField(max_length=20, choices=[
+        ('pending', 'Pending'),
+        ('accepted', 'Accepted'),
+        ('rejected', 'Rejected')
+    ], default='pending')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'SubstitutionRequest'
+        unique_together = (('event', 'requesting_user', 'target_user'),)
+
+    def __str__(self):
+        return f"{self.requesting_user.get_full_name()} → {self.target_user.get_full_name()} for {self.event.name}"

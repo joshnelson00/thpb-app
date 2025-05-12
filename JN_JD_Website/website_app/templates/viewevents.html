@@ -106,6 +106,13 @@
                                             </div>
                                         {% endif %}
                                     {% endif %}
+
+                                    {% if event.user_can_attend %}
+                                        <a href="{% url 'requestsub' event.id %}" class="action-btn need-sub">
+                                            <i class="fas fa-user-exchange"></i>
+                                            Need a sub?
+                                        </a>
+                                    {% endif %}
                                 </div>
                             </div>
                         </div>
@@ -389,9 +396,20 @@
         color: var(--white);
     }
 
+    .action-btn.need-sub {
+        background: var(--medium-blue-slate);
+        color: var(--white);
+    }
+
     .action-btn:hover {
         transform: translateY(-2px);
         filter: brightness(1.1);
+    }
+
+    .action-btn.need-sub:hover {
+        background: var(--periwinkle);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(102, 102, 255, 0.2);
     }
 
     .check-in-status {

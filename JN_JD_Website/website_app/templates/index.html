@@ -38,13 +38,14 @@
                             <li><a href="{% url 'viewevents' %}?filter=upcoming"><i class="fas fa-clock"></i> Upcoming Events</a></li>
                             <li><a href="{% url 'pastevents' %}"><i class="fas fa-history"></i> Past Events</a></li>
                             <li><a href="{% url 'createevent' %}"><i class="fas fa-plus"></i> Create Event</a></li>
+                            <li><a href="{% url 'pending_substitution_requests' %}"><i class="fas fa-user-clock"></i> Pending Requests</a></li>
                         </ul>
                     </li>
                     <li class="mobile-dropdown">
                         <a href="#" onclick="toggleMobileDropdown(this)"><i class="fas fa-users"></i> Groups <i class="fas fa-chevron-down"></i></a>
                         <ul class="mobile-dropdown-menu">
-                            <li><a href="{% url 'creategroup' %}"><i class="fas fa-plus"></i> Create Group</a></li>
                             <li><a href="{% url 'vieworgs' %}?view=manage"><i class="fas fa-cog"></i> Manage Groups</a></li>
+                            <li><a href="{% url 'creategroup' %}"><i class="fas fa-plus"></i> Create Group</a></li>
                         </ul>
                     </li>
                     <li class="mobile-dropdown">
@@ -72,13 +73,14 @@
                     <li><a href="{% url 'viewevents' %}?filter=upcoming"><i class="fas fa-clock"></i> Upcoming Events</a></li>
                     <li><a href="{% url 'pastevents' %}"><i class="fas fa-history"></i> Past Events</a></li>
                     <li><a href="{% url 'createevent' %}"><i class="fas fa-plus"></i> Create Event</a></li>
+                    <li><a href="{% url 'pending_substitution_requests' %}"><i class="fas fa-user-clock"></i> Pending Requests</a></li>
                 </ul>
             </li>
             <li class="dropdown">
                 <a href="#"><i class="fas fa-users"></i> Groups</a>
                 <ul class="dropdown-menu">
-                    <li><a href="{% url 'creategroup' %}"><i class="fas fa-plus"></i> Create Group</a></li>
                     <li><a href="{% url 'vieworgs' %}?view=manage"><i class="fas fa-cog"></i> Manage Groups</a></li>
+                    <li><a href="{% url 'creategroup' %}"><i class="fas fa-plus"></i> Create Group</a></li>
                 </ul>
             </li>
             <li class="dropdown">

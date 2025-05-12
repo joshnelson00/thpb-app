@@ -1,0 +1,350 @@
+{% extends 'index.html' %}
+
+{% block title %}Pending Substitution Requests{% endblock %}
+
+{% block content %}
+<div class="content">
+    <div class="dashboard-card">
+        <div class="card-header">
+            <h2><i class="fas fa-user-exchange"></i> Pending Substitution Requests</h2>
+            {% if total_pending > 0 %}
+            <span class="badge">{{ total_pending }} pending</span>
+            {% endif %}
+        </div>
+        <div class="card-content">
+            <div class="substitution-requests-container">
+                <div class="substitution-requests-list">
+                    {% for request in pending_requests %}
+                    <div class="substitution-request-item">
+                        <div class="substitution-request-details">
+                            <div class="event-info">
+                                <h3>{{ request.event.name }}</h3>
+                                <p class="event-date">
+                                    <i class="fas fa-calendar"></i>
+                                    {{ request.event.date|date:"F d, Y" }}
+                                    <i class="fas fa-clock"></i>
+                                    {{ request.event.time|time:"g:i A" }}
+                                    <span class="timezone">({{ request.event.timezone }})</span>
+                                </p>
+                            </div>
+                            <div class="user-exchange">
+                                <div class="user-info">
+                                    <span class="label">From:</span>
+                                    <span class="user-name">{{ request.requesting_user.f_name }} {{ request.requesting_user.l_name }}</span>
+                                </div>
+                                <i class="fas fa-arrow-right"></i>
+                                <div class="user-info">
+                                    <span class="label">To:</span>
+                                    <span class="user-name">{{ request.target_user.f_name }} {{ request.target_user.l_name }}</span>
+                                </div>
+                            </div>
+                            <div class="request-meta">
+                                <span class="substitution-request-status status-{{ request.status }}">
+                                    {{ request.status|title }}
+                                </span>
+                                <span class="request-date">
+                                    <i class="fas fa-clock"></i>
+                                    Requested {{ request.created_at|timesince }} ago
+                                </span>
+                            </div>
+                        </div>
+                        <div class="substitution-request-actions">
+                            <button class="accept-request" data-request-id="{{ request.id }}">
+                                <i class="fas fa-check"></i> Accept
+                            </button>
+                            <button class="reject-request" data-request-id="{{ request.id }}">
+                                <i class="fas fa-times"></i> Reject
+                            </button>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="no-requests">
+                        <i class="fas fa-inbox"></i>
+                        <p>No pending substitution requests.</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Handle accept/reject buttons
+    document.querySelectorAll('.accept-request, .reject-request').forEach(button => {
+        button.addEventListener('click', async () => {
+            const requestId = button.dataset.requestId;
+            const action = button.classList.contains('accept-request') ? 'accept' : 'reject';
+            const actionText = action === 'accept' ? 'Accepting' : 'Rejecting';
+            
+            // Disable all buttons during the request
+            document.querySelectorAll('.accept-request, .reject-request').forEach(btn => {
+                btn.disabled = true;
+            });
+            
+            // Update clicked button text
+            button.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${actionText}...`;
+            
+            try {
+                const response = await fetch(`/respond_to_substitution_request/${requestId}/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                    },
+                    body: new URLSearchParams({
+                        'action': action
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Show success message
+                    const message = action === 'accept' ? 'Request accepted successfully' : 'Request rejected successfully';
+                    const messageDiv = document.createElement('div');
+                    messageDiv.className = 'alert alert-success';
+                    messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> ${message}`;
+                    document.querySelector('.card-content').insertBefore(messageDiv, document.querySelector('.substitution-requests-container'));
+                    
+                    // Remove the message after 3 seconds
+                    setTimeout(() => {
+                        messageDiv.remove();
+                        window.location.reload();
+                    }, 3000);
+                } else {
+                    throw new Error(data.error || 'Error responding to substitution request');
+                }
+            } catch (error) {
+                console.error('Error responding to substitution request:', error);
+                
+                // Show error message
+                const messageDiv = document.createElement('div');
+                messageDiv.className = 'alert alert-error';
+                messageDiv.innerHTML = `<i class="fas fa-exclamation-circle"></i> ${error.message}`;
+                document.querySelector('.card-content').insertBefore(messageDiv, document.querySelector('.substitution-requests-container'));
+                
+                // Remove the message after 3 seconds
+                setTimeout(() => {
+                    messageDiv.remove();
+                    window.location.reload();
+                }, 3000);
+            }
+        });
+    });
+});
+</script>
+
+<style>
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.badge {
+    background: var(--periwinkle);
+    color: var(--rich-black);
+    padding: 0.25rem 0.75rem;
+    border-radius: 12px;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.event-info {
+    margin-bottom: 1rem;
+}
+
+.event-info h3 {
+    color: var(--text-light);
+    margin: 0;
+    font-size: 1.2rem;
+}
+
+.event-date {
+    color: var(--text-muted);
+    margin: 0.25rem 0 0;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.timezone {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+}
+
+.substitution-request-item {
+    background: var(--darker-bg);
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    border: 1px solid var(--medium-blue-slate);
+}
+
+.substitution-request-details {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.user-exchange {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    color: var(--text-light);
+}
+
+.user-exchange i {
+    color: var(--periwinkle);
+}
+
+.request-meta {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.group-badge {
+    display: inline-block;
+    background: var(--group-color);
+    color: var(--rich-black);
+    padding: 0.25rem 0.75rem;
+    border-radius: 12px;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.substitution-request-status {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    border-radius: 12px;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.status-pending {
+    background: #ffd700;
+    color: #000;
+}
+
+.request-date {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.substitution-request-actions {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.accept-request, .reject-request {
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.accept-request {
+    background: #28a745;
+    color: white;
+}
+
+.reject-request {
+    background: #dc3545;
+    color: white;
+}
+
+.accept-request:hover, .reject-request:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.accept-request:disabled, .reject-request:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+.no-requests {
+    text-align: center;
+    color: var(--text-muted);
+    padding: 2rem;
+    font-size: 1.1rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+}
+
+.no-requests i {
+    font-size: 2rem;
+    color: var(--periwinkle);
+}
+
+.alert {
+    padding: 1rem;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.alert-success {
+    background: #28a745;
+    color: white;
+}
+
+.alert-error {
+    background: #dc3545;
+    color: white;
+}
+
+@media (max-width: 768px) {
+    .request-meta {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .substitution-request-actions {
+        flex-direction: column;
+    }
+    
+    .accept-request, .reject-request {
+        width: 100%;
+        justify-content: center;
+    }
+}
+
+.user-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.user-info .label {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
+.user-info .user-name {
+    font-size: 1.1rem;
+    font-weight: 500;
+    color: var(--text-light);
+}
+</style>
+{% endblock %} 

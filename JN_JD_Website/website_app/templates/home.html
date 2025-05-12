@@ -18,6 +18,7 @@
                 <div class="card-content">
                     {% if upcoming_events %}
                         {% for event in upcoming_events %}
+                        {% if event.owner == request.user or event.user_can_attend %}
                         <div class="event-item">
                             <div class="event-date">
                                 <span class="day">{{ event.date|date:"d" }}</span>
@@ -31,7 +32,6 @@
                                     <span class="groups-label">Groups:</span>
                                     {% for group in event.attending_groups %}
                                     <div class="event-group" style="--group-color: {{ group.color }}">
-                                        <i class="fas fa-user-friends"></i>
                                         {{ group.name }}
                                     </div>
                                     {% endfor %}
@@ -87,6 +87,7 @@
                                 </div>
                             </div>
                         </div>
+                        {% endif %}
                         {% endfor %}
                     {% else %}
                         <div class="empty-state">
@@ -399,7 +400,7 @@
 
     .dashboard-grid {
         display: grid;
-        grid-template-columns: 1fr 1.5fr 1fr;
+        grid-template-columns: 1fr 1.4fr 1fr;
         gap: 1.5rem;
         width: 100%;
         margin: 0 auto;
@@ -810,6 +811,7 @@
     .quick-action-btn i {
         font-size: 1.75rem;
         color: var(--periwinkle);
+        transition: all 0.3s ease;
     }
 
     .quick-action-btn span {
@@ -819,6 +821,7 @@
         overflow: hidden;
         text-overflow: ellipsis;
         width: 100%;
+        transition: all 0.3s ease;
     }
 
     .quick-action-btn .description {
@@ -831,6 +834,27 @@
         -webkit-line-clamp: 2;
         -webkit-box-orient: vertical;
         overflow: hidden;
+        transition: all 0.3s ease;
+    }
+
+    .quick-action-btn:hover {
+        transform: translateY(-2px);
+        background: var(--dark-bg);
+        border-color: var(--periwinkle);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+
+    .quick-action-btn:hover i {
+        transform: scale(1.1);
+        color: var(--periwinkle);
+    }
+
+    .quick-action-btn:hover span {
+        color: var(--white);
+    }
+
+    .quick-action-btn:hover .description {
+        color: var(--text-light);
     }
 
     .org-item {
@@ -1153,7 +1177,7 @@
         color: var(--text-light);
         line-height: 1.8;
         margin-bottom: 2rem;
-        font-size: 1.1rem;
+        font-size: 0.9rem;
         min-height: unset;
         height: auto;
         max-height: unset;
@@ -1165,6 +1189,7 @@
     .announcement-content p {
         color: var(--white);
         margin: 0.5rem 0;
+        font-size: 0.95rem;
     }
 
     .announcement-files {
