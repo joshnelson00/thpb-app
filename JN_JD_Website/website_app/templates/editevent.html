@@ -43,6 +43,33 @@
                         <textarea id="event-description" name="description" rows="4" required>{{ event.description }}</textarea>
                     </div>
 
+                    <!-- Geofence Section -->
+                    <div class="form-group">
+                        <div class="form-label">
+                            <i class="fas fa-map"></i>
+                            Event Location
+                        </div>
+                        <div id="map" class="map-container"></div>
+                        
+                        <div class="form-group">
+                            <div class="form-label">
+                                <i class="fas fa-ruler"></i>
+                                Radius (meters)
+                            </div>
+                            <div class="radius-control">
+                                <input type="range" id="radiusSlider" min="10" max="10000" step="10" value="{{ event.geofence_radius|default:50 }}">
+                                <span id="radiusValue">{{ event.geofence_radius|default:50 }}</span>
+                                <input type="hidden" name="radius" id="radiusInput" value="{{ event.geofence_radius|default:50 }}">
+                            </div>
+                        </div>
+                        
+                        <!-- Hidden latitude and longitude fields -->
+                        <div class="visually-hidden">
+                            <input type="hidden" name="latitude" id="latitude" value="{{ event.geofence_latitude }}">
+                            <input type="hidden" name="longitude" id="longitude" value="{{ event.geofence_longitude }}">
+                        </div>
+                    </div>
+
                     <div class="form-actions">
                         <button type="submit" class="action-btn save">
                             <i class="fas fa-save"></i>
@@ -108,145 +135,269 @@
     </form>
 </div>
 
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<!-- Leaflet CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+
 <script>
-    $(document).ready(function() {
-        // Form submission handler
-        $('#editEventForm').on('submit', function(e) {
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('editEventForm');
+    
+    // Initialize map with event's current location or default coordinates
+    const initialLat = {{ event.geofence_latitude|default:"33.51314706106841" }};
+    const initialLng = {{ event.geofence_longitude|default:"-112.12542386469842" }};
+    const initialRadius = {{ event.geofence_radius|default:50 }};
+    
+    const map = L.map('map').setView([initialLat, initialLng], 15);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    let marker = null;
+    let circle = null;
+    const radiusSlider = document.getElementById('radiusSlider');
+    const radiusValue = document.getElementById('radiusValue');
+    const radiusInput = document.getElementById('radiusInput');
+    const latitudeInput = document.getElementById('latitude');
+    const longitudeInput = document.getElementById('longitude');
+
+    // Set initial marker and circle
+    marker = L.marker([initialLat, initialLng], {
+        draggable: true
+    }).addTo(map);
+    circle = L.circle([initialLat, initialLng], {
+        radius: initialRadius,
+        color: 'red',
+        fillColor: '#f03',
+        fillOpacity: 0.2
+    }).addTo(map);
+
+    // Add marker drag event handlers
+    marker.on('dragstart', function(e) {
+        if (circle) {
+            circle.setStyle({ fillOpacity: 0.1 });
+        }
+    });
+
+    marker.on('drag', function(e) {
+        const lat = e.target.getLatLng().lat;
+        const lng = e.target.getLatLng().lng;
+        
+        if (circle) {
+            circle.setLatLng([lat, lng]);
+        }
+    });
+
+    marker.on('dragend', function(e) {
+        const lat = e.target.getLatLng().lat;
+        const lng = e.target.getLatLng().lng;
+        
+        latitudeInput.value = lat.toFixed(6);
+        longitudeInput.value = lng.toFixed(6);
+        
+        if (circle) {
+            circle.setLatLng([lat, lng]);
+            circle.setStyle({ fillOpacity: 0.2 });
+        }
+    });
+
+    // Update radius display and hidden input
+    radiusSlider.addEventListener('input', function() {
+        const value = this.value;
+        radiusValue.textContent = value;
+        radiusInput.value = value;
+        if (circle) {
+            circle.setRadius(parseInt(value));
+        }
+    });
+
+    // Handle map clicks
+    map.on('click', function(e) {
+        const lat = e.latlng.lat;
+        const lng = e.latlng.lng;
+        
+        latitudeInput.value = lat.toFixed(6);
+        longitudeInput.value = lng.toFixed(6);
+        
+        if (marker) {
+            map.removeLayer(marker);
+        }
+        if (circle) {
+            map.removeLayer(circle);
+        }
+        
+        marker = L.marker([lat, lng]).addTo(map);
+        circle = L.circle([lat, lng], {
+            radius: parseInt(radiusSlider.value),
+            color: 'red',
+            fillColor: '#f03',
+            fillOpacity: 0.2
+        }).addTo(map);
+    });
+
+    // Drag and Drop Functionality
+    const availableList = document.getElementById('available-list');
+    const attendingList = document.getElementById('attending-list');
+    const eventId = {{ event.id }};
+
+    // Add drag and drop event listeners to both lists
+    [availableList, attendingList].forEach(list => {
+        list.addEventListener('dragover', e => {
             e.preventDefault();
-            
-            const formData = {
-                name: $('#event-name').val(),
-                date: $('#event-date').val(),
-                time: $('#event-time').val(),
-                location: $('#event-location').val(),
-                description: $('#event-description').val(),
-                organization: '{{ event.organization.id }}',  // Add organization ID
-                latitude: '{{ event.geofence_latitude }}',   // Add latitude
-                longitude: '{{ event.geofence_longitude }}', // Add longitude
-                radius: '{{ event.geofence_radius }}',       // Add radius
-                groups: []  // Add empty groups array
-            };
-
-            $.ajax({
-                url: "{% url 'editevent' event.id %}",
-                method: 'POST',
-                data: formData,
-                headers: {
-                    'X-CSRFToken': '{{ csrf_token }}'
-                },
-                success: function(response) {
-                    if (response.success) {
-                        alert(response.message || 'Event updated successfully');
-                        window.location.href = "{% url 'viewevents' %}";
-                    } else {
-                        alert('Error updating event: ' + (response.error || 'Unknown error occurred'));
-                    }
-                },
-                error: function(xhr, status, error) {
-                    console.error('Error:', xhr.responseText);
-                    alert('Error updating event: ' + (xhr.responseJSON?.error || 'Unknown error occurred'));
-                }
-            });
+            list.classList.add('drag-over');
         });
 
-        // Reset form handler
-        $('.action-btn.reset').on('click', function(e) {
+        list.addEventListener('dragleave', () => {
+            list.classList.remove('drag-over');
+        });
+
+        list.addEventListener('drop', e => {
             e.preventDefault();
-            if (confirm('Are you sure you want to reset all changes?')) {
-                $('#editEventForm')[0].reset();
-            }
-        });
-
-        // Delete event functionality
-        $('#deleteEvent').on('click', function() {
-            if (confirm('Are you sure you want to delete this event? This action cannot be undone.')) {
-                $.ajax({
-                    url: "{% url 'delete_event' event.id %}",
-                    method: 'POST',
-                    headers: {
-                        'X-CSRFToken': '{{ csrf_token }}'
-                    },
-                    success: function(response) {
-                        if (response.success) {
-                            alert(response.message || 'Event deleted successfully');
-                            window.location.href = "{% url 'viewevents' %}";
-                        } else {
-                            alert('Error deleting event: ' + (response.error || 'Unknown error occurred'));
-                        }
-                    },
-                    error: function(xhr, status, error) {
-                        alert('Error deleting event: ' + (xhr.responseJSON?.error || 'Unknown error occurred'));
-                    }
-                });
-            }
-        });
-
-        // Drag and drop for users
-        let draggedUser = null;
-
-        $(document).on('dragstart', '.user-item', function(event) {
-            event.originalEvent.dataTransfer.setData('user_id', $(this).data('user-id'));
-            draggedUser = $(this);
-            $(this).addClass('dragging');
-        });
-
-        $(document).on('dragend', '.user-item', function() {
-            $(this).removeClass('dragging');
-            $('.user-list').removeClass('drag-over');
-        });
-
-        $('.user-list').on('dragover', function(event) {
-            event.preventDefault();
-            $(this).addClass('drag-over');
-        });
-
-        $('.user-list').on('dragleave', function(event) {
-            $(this).removeClass('drag-over');
-        });
-
-        $('.user-list').on('drop', function(event) {
-            event.preventDefault();
-            const user_id = event.originalEvent.dataTransfer.getData('user_id');
-            const $user = $('.user-item[data-user-id="' + user_id + '"]');
-            const isAttending = $(this).attr('id') === 'attending-list';
+            list.classList.remove('drag-over');
             
-            // Toggle attendance via AJAX
-            $.ajax({
-                url: "{% url 'update_event_attendee' %}",
-                method: 'POST',
-                contentType: 'application/json',
-                data: JSON.stringify({
-                    user_id: user_id,
-                    event_id: "{{ event.id }}",
-                    action: isAttending ? 'add' : 'remove'
-                }),
-                headers: {
-                    'X-CSRFToken': '{{ csrf_token }}'
-                },
-                success: function(response) {
-                    if (response.success) {
-                        if (isAttending) {
-                            $user.appendTo('#attending-list');
-                            $user.removeClass('not-attending').addClass('attending');
-                            $user.find('.attendance-status').removeClass('not-attending').addClass('attending').html('<i class="fas fa-check"></i>');
-                        } else {
-                            $user.appendTo('#available-list');
-                            $user.removeClass('attending').addClass('not-attending');
-                            $user.find('.attendance-status').removeClass('attending').addClass('not-attending').html('<i class="fas fa-times"></i>');
-                        }
-                    } else {
-                        alert('Error updating attendance: ' + (response.error || 'Unknown error'));
-                    }
-                },
-                error: function(xhr, status, error) {
-                    alert('Error updating attendance: ' + (xhr.responseJSON?.error || 'Unknown error'));
-                }
-            });
-            
-            $(this).removeClass('drag-over');
+            const userItem = document.querySelector('.dragging');
+            if (!userItem) return;
+
+            const userId = userItem.dataset.userId;
+            const action = list.id === 'attending-list' ? 'add' : 'remove';
+
+            // Update the UI immediately
+            userItem.classList.remove('dragging');
+            list.appendChild(userItem);
+            updateUserItemStatus(userItem, action);
+
+            // Send update to server
+            updateEventAttendee(userId, action);
         });
     });
+
+    // Add drag event listeners to all user items
+    document.querySelectorAll('.user-item').forEach(item => {
+        item.addEventListener('dragstart', () => {
+            item.classList.add('dragging');
+        });
+
+        item.addEventListener('dragend', () => {
+            item.classList.remove('dragging');
+        });
+    });
+
+    // Helper function to update user item appearance
+    function updateUserItemStatus(userItem, action) {
+        const statusSpan = userItem.querySelector('.attendance-status');
+        if (action === 'add') {
+            userItem.classList.remove('not-attending');
+            userItem.classList.add('attending');
+            statusSpan.className = 'attendance-status attending';
+            statusSpan.innerHTML = '<i class="fas fa-check"></i>';
+        } else {
+            userItem.classList.remove('attending');
+            userItem.classList.add('not-attending');
+            statusSpan.className = 'attendance-status not-attending';
+            statusSpan.innerHTML = '<i class="fas fa-times"></i>';
+        }
+    }
+
+    // Function to update event attendee on server
+    function updateEventAttendee(userId, action) {
+        fetch('/update_event_attendee/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify({
+                user_id: userId,
+                event_id: eventId,
+                action: action
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (!data.success) {
+                console.error('Error updating attendee:', data.error);
+                // Optionally revert the UI change if the server update failed
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            // Optionally revert the UI change if the server update failed
+        });
+    }
+
+    // Form submission handler
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        // Validate required fields
+        const requiredFields = ['name', 'description', 'date', 'location', 'latitude', 'longitude', 'radius'];
+        let isValid = true;
+        
+        requiredFields.forEach(fieldName => {
+            const field = form.querySelector(`[name="${fieldName}"]`);
+            if (field && !field.value) {
+                isValid = false;
+                field.classList.add('error');
+            } else if (field) {
+                field.classList.remove('error');
+            }
+        });
+        
+        if (isValid) {
+            // Create FormData object from the form
+            const formData = new FormData(form);
+            
+            // Add the organization ID
+            formData.append('organization', '{{ event.organization.id }}');
+            
+            // Add the latitude, longitude, and radius
+            formData.append('latitude', latitudeInput.value);
+            formData.append('longitude', longitudeInput.value);
+            formData.append('radius', radiusInput.value);
+
+            fetch("{% url 'editevent' event.id %}", {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert(data.message || 'Event updated successfully');
+                    window.location.href = "{% url 'viewevents' %}";
+                } else {
+                    alert('Error updating event: ' + (data.error || 'Unknown error occurred'));
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error updating event: ' + error);
+            });
+        } else {
+            alert('Please fill in all required fields');
+        }
+    });
+
+    // Helper function to get CSRF token
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+});
 </script>
 
 <style>
@@ -479,6 +630,7 @@
         transition: all 0.2s ease;
         border: 1px solid transparent;
         font-size: 0.9rem;
+        user-select: none;
     }
 
     .user-item.attending {
@@ -494,6 +646,7 @@
     .user-item.dragging {
         opacity: 0.5;
         transform: scale(0.98);
+        cursor: grabbing;
     }
 
     .user-item:hover {
@@ -567,6 +720,96 @@
     .action-btn.delete:hover {
         background: #c82333;
         transform: translateY(-2px);
+    }
+
+    .map-container {
+        height: 40vh;
+        width: 100%;
+        max-width: 600px;
+        margin: 1rem auto;
+        border-radius: 8px;
+        overflow: hidden;
+        border: 1px solid var(--medium-blue-slate);
+    }
+
+    .radius-control {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.5rem;
+        margin-top: 0.5rem;
+        max-width: 600px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    #radiusSlider {
+        width: 100%;
+        height: 6px;
+        background: var(--darker-bg);
+        border-radius: 3px;
+        outline: none;
+        -webkit-appearance: none;
+        cursor: pointer;
+        border: 1px solid var(--medium-blue-slate);
+    }
+
+    #radiusSlider::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 18px;
+        height: 18px;
+        background: linear-gradient(to right, var(--medium-blue-slate) 0%, var(--periwinkle) 100%);
+        border-radius: 50%;
+        cursor: pointer;
+        border: 2px solid var(--white);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        transition: all 0.2s ease;
+    }
+
+    #radiusSlider::-webkit-slider-thumb:hover {
+        transform: scale(1.1);
+    }
+
+    #radiusSlider::-moz-range-thumb {
+        width: 18px;
+        height: 18px;
+        background: linear-gradient(to right, var(--medium-blue-slate) 0%, var(--periwinkle) 100%);
+        border-radius: 50%;
+        cursor: pointer;
+        border: 2px solid var(--white);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        transition: all 0.2s ease;
+    }
+
+    #radiusSlider::-moz-range-thumb:hover {
+        transform: scale(1.1);
+    }
+
+    #radiusValue {
+        color: var(--text-light);
+        font-weight: 500;
+        font-size: 1.1rem;
+        text-align: center;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.25rem;
+    }
+
+    #radiusValue::after {
+        content: "meters";
+        font-size: 0.9rem;
+        color: var(--text-muted);
+    }
+
+    .visually-hidden {
+        position: absolute !important;
+        height: 1px;
+        width: 1px;
+        overflow: hidden;
+        clip: rect(1px, 1px, 1px, 1px);
+        white-space: nowrap;
     }
 </style>
 {% endblock %}

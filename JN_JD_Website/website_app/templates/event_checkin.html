@@ -29,7 +29,7 @@
                             Groups: 
                             {% if event.attending_groups %}
                                 {% for group in event.attending_groups %}
-                                    <span class="group-tag">{{ group }}</span>{% if not forloop.last %} {% endif %}
+                                    <span class="group-tag" style="background-color: {{ group.color }}">{{ group.name }}</span>{% if not forloop.last %} {% endif %}
                                 {% endfor %}
                             {% else %}
                                 <span class="no-groups">No groups assigned</span>

@@ -1006,6 +1006,11 @@ def event_attendance(request, event_id):
     
     # Create attendance lists
     attended = [check_in.user for check_in in check_ins]
+    
+    # Get all users who checked in but weren't expected to attend
+    unexpected_attendees = [user for user in attended if user not in expected_attendees]
+    
+    # Get all expected attendees who didn't show up
     absent = [user for user in expected_attendees if user not in attended]
     
     # Calculate attendance rate safely
@@ -1017,6 +1022,7 @@ def event_attendance(request, event_id):
         'event': event,
         'attended': attended,
         'absent': absent,
+        'unexpected_attendees': unexpected_attendees,
         'total_expected': total_expected,
         'total_attended': total_attended,
         'attendance_rate': attendance_rate
@@ -1306,38 +1312,69 @@ def update_group_color(request):
 
 @login_required
 def update_event_attendee(request):
-    try:
-        data = json.loads(request.body)
-        user_id = data.get('user_id')
-        event_id = data.get('event_id')
-        action = data.get('action')
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            user_id = data.get('user_id')
+            event_id = data.get('event_id')
+            action = data.get('action')
 
-        if not all([user_id, event_id, action]):
-            return JsonResponse({"success": False, "error": "Missing required parameters"}, status=400)
+            if not all([user_id, event_id, action]):
+                return JsonResponse({'success': False, 'error': 'Missing required fields'})
 
-        event = get_object_or_404(Event, id=event_id, owner=request.user)
-        user = get_object_or_404(User, id=user_id)
+            event = Event.objects.get(id=event_id)
+            user = User.objects.get(id=user_id)
 
-        if action == "add":
-            # Add user to attendees
-            EventAttendees.objects.get_or_create(event=event, user=user)
-            return JsonResponse({
-                "success": True,
-                "message": f"User {user.f_name} {user.l_name} added to event {event.name}"
-            })
-        elif action == "remove":
-            # Remove user from attendees
-            EventAttendees.objects.filter(event=event, user=user).delete()
-            return JsonResponse({
-                "success": True,
-                "message": f"User {user.f_name} {user.l_name} removed from event {event.name}"
-            })
-        else:
-            return JsonResponse({"success": False, "error": "Invalid action"}, status=400)
+            # Verify the current user has permission to modify the event
+            if not (request.user.is_staff or event.owner == request.user):
+                return JsonResponse({'success': False, 'error': 'Permission denied'})
 
-    except Exception as e:
-        print(f"Unexpected error: {e}")
-        return JsonResponse({"success": False, "error": str(e)}, status=500)
+            # Check for pending substitution requests
+            pending_requests = SubstitutionRequest.objects.filter(
+                event=event,
+                status='pending'
+            ).filter(
+                Q(requesting_user=user) | Q(target_user=user)
+            )
+
+            if pending_requests.exists():
+                return JsonResponse({
+                    'success': False, 
+                    'error': 'Cannot modify attendance while there are pending substitution requests for this user'
+                })
+
+            # Check for existing substitutions
+            existing_substitution = EventSubstitution.objects.filter(
+                event=event
+            ).filter(
+                Q(original_user=user) | Q(substitute_user=user)
+            ).first()
+
+            if existing_substitution:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Cannot modify attendance for users involved in a substitution'
+                })
+
+            if action == 'add':
+                # Use EventAttendees model to maintain consistency with substitution system
+                EventAttendees.objects.get_or_create(event=event, user=user)
+            elif action == 'remove':
+                # Remove from EventAttendees
+                EventAttendees.objects.filter(event=event, user=user).delete()
+                # Also remove any check-ins or attendance records
+                EventCheckIn.objects.filter(event=event, user=user).delete()
+                EventAttendance.objects.filter(event=event, user=user).delete()
+            else:
+                return JsonResponse({'success': False, 'error': 'Invalid action'})
+
+            return JsonResponse({'success': True})
+        except (Event.DoesNotExist, User.DoesNotExist):
+            return JsonResponse({'success': False, 'error': 'Event or user not found'})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+
+    return JsonResponse({'success': False, 'error': 'Invalid request method'})
 
 @login_required
 def get_group_members(request, group_id):
@@ -1599,7 +1636,7 @@ def event_checkin_page(request, event_id):
         'user': request.user,
     }
     
-    return render(request, 'eventcheckin.html', context)
+    return render(request, 'event_checkin.html', context)
 
 @login_required
 def create_announcement(request, org_id):
@@ -1781,6 +1818,12 @@ def request_sub(request, event_id):
         # Get all users from the organization who aren't currently attending
         organization_users = User.objects.filter(
             user_organizations__organization=event.organization
+        ).exclude(
+            # Exclude users who are already attending
+            id__in=EventAttendees.objects.filter(event=event).values_list('user_id', flat=True)
+        ).exclude(
+            # Exclude the event owner
+            id=event.organization.owner.id
         ).distinct()
         
         # Get pending requests count for the current user

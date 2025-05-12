@@ -50,10 +50,10 @@
                                         </div>
                                         {% if not event.owner == request.user and not event.user_check_in %}
                                             <div class="check-in-spacer"></div>
-                                            <a href="{% url 'event_checkin_page' event.id %}" class="action-btn check-in">
+                                            <button class="action-btn check-in check-in-btn" data-event-id="{{ event.id }}">
                                                 <i class="fas fa-map-marker-alt"></i>
                                                 Check In
-                                            </a>
+                                            </button>
                                         {% endif %}
                                     {% else %}
                                         <div class="status-badge past">
@@ -1839,5 +1839,99 @@
             });
         });
     });
+
+    document.addEventListener('DOMContentLoaded', function() {
+        // Update countdown timers every minute
+        setInterval(updateCountdowns, 60000);
+        updateCountdowns();
+
+        // Handle check-in button clicks
+        document.querySelectorAll('.check-in-btn').forEach(button => {
+            button.addEventListener('click', handleCheckIn);
+        });
+    });
+
+    function updateCountdowns() {
+        document.querySelectorAll('.countdown').forEach(countdown => {
+            const minutes = parseInt(countdown.dataset.minutes);
+            const countdownText = countdown.querySelector('.countdown-text');
+            
+            if (countdownText) {
+                if (minutes >= 1440) {
+                    const days = Math.floor(minutes / 1440);
+                    const remainingMinutes = minutes % 1440;
+                    const hours = Math.floor(remainingMinutes / 60);
+                    countdownText.textContent = `${days}d ${hours}h`;
+                } else if (minutes >= 60) {
+                    const hours = Math.floor(minutes / 60);
+                    const remainingMinutes = minutes % 60;
+                    countdownText.textContent = `${hours}h ${remainingMinutes}m`;
+                } else {
+                    countdownText.textContent = `${minutes}m`;
+                }
+            }
+        });
+    }
+
+    function handleCheckIn(event) {
+        const button = event.currentTarget;
+        const eventId = button.dataset.eventId;
+
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                position => {
+                    const data = {
+                        latitude: position.coords.latitude,
+                        longitude: position.coords.longitude
+                    };
+
+                    fetch(`/event/${eventId}/check-in/`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': getCookie('csrftoken')
+                        },
+                        body: JSON.stringify(data)
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            // Replace button with success message
+                            const statusDiv = document.createElement('div');
+                            statusDiv.className = 'check-in-status checked-in';
+                            statusDiv.innerHTML = '<i class="fas fa-check-circle"></i> Checked in';
+                            button.parentNode.replaceChild(statusDiv, button);
+                        } else {
+                            alert(data.error || 'Failed to check in. Please try again.');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        alert('Failed to check in. Please try again.');
+                    });
+                },
+                error => {
+                    alert('Please enable location services to check in.');
+                }
+            );
+        } else {
+            alert('Geolocation is not supported by your browser.');
+        }
+    }
+
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
 </script>
 {% endblock %}

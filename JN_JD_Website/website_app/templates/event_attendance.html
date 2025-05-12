@@ -72,6 +72,21 @@
                 </div>
             </div>
 
+                    <!-- Unexpected Attendees -->
+                    {% if unexpected_attendees %}
+                    <div class="attendance-section">
+                        <h3><i class="fas fa-user-plus"></i> Unexpected Attendees ({{ unexpected_attendees|length }})</h3>
+                        <div class="user-list">
+                            {% for user in unexpected_attendees %}
+                                <div class="user-item unexpected">
+                                    <i class="fas fa-user"></i>
+                                    {{ user.f_name }} {{ user.l_name }}
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+
                     <!-- Absent Users -->
                     <div class="attendance-section">
                         <h3><i class="fas fa-times-circle"></i> Absent ({{ absent|length }})</h3>
@@ -253,6 +268,10 @@
 
     .user-item.absent {
         border-left: 4px solid var(--red);
+    }
+
+    .user-item.unexpected {
+        border-left: 4px solid var(--periwinkle);
     }
 
     .no-users {
