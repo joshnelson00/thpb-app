@@ -1,0 +1,91 @@
+{% extends 'index.html' %}
+{% load static %}
+
+{% block content %}
+<div class="content">
+    <h1>Account Details</h1>
+    <div class="account-details">
+        <div class="profile-section">
+            <div class="profile-header">
+                <div class="profile-avatar">
+                    {{ user.f_name|slice:":1"|upper }}
+                </div>
+                <h2>{{ user.f_name }} {{ user.l_name }}</h2>
+            </div>
+            <div class="profile-info">
+                <div class="info-group">
+                    <label>Email:</label>
+                    <p>{{ user.email }}</p>
+                </div>
+                <div class="info-group">
+                    <label>Username:</label>
+                    <p>{{ user.username }}</p>
+                </div>
+                <div class="info-group">
+                    <label>Location:</label>
+                    <p>{{ user.location|default:"Not set" }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.account-details {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+.profile-section {
+    background: var(--white);
+    border-radius: 12px;
+    padding: 2rem;
+    box-shadow: 0 2px 8px var(--shadow);
+}
+
+.profile-header {
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+    margin-bottom: 2rem;
+}
+
+.profile-avatar {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    background-color: var(--medium-blue-slate);
+    color: var(--white);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 3rem;
+    font-weight: bold;
+    border: 3px solid var(--periwinkle);
+}
+
+.profile-info {
+    display: grid;
+    gap: 1.5rem;
+}
+
+.info-group {
+    display: grid;
+    gap: 0.5rem;
+}
+
+.info-group label {
+    color: var(--medium-blue-slate);
+    font-weight: 500;
+}
+
+.info-group p {
+    margin: 0;
+    padding: 0.5rem;
+    background-color: var(--light-gray);
+    border-radius: 6px;
+    border: 1px solid var(--periwinkle);
+}
+</style>
+{% endblock %} 

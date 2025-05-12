@@ -2,13 +2,186 @@
 {% load static %}
 
 {% block content %}
-<div class="content">
-    <h1>Create Organization</h1>
-    <form method="post" class="form">
-        {% csrf_token %}
-        {{ form.name }}
-        <button type="submit">Submit</button>
-    </form>
-    
+<div class="home-container">
+    <div class="form-container">
+        <div class="welcome-section">
+            <h1><i class="fas fa-building"></i> Create Organization</h1>
+            <p class="welcome-message">Create a new organization to manage your groups and events.</p>
+        </div>
+
+        <form method="post" class="create-org-form">
+            {% csrf_token %}
+            <div class="form-group">
+                {{ form.name.label_tag }}
+                {{ form.name }}
+                {% if form.name.errors %}
+                    <div class="error-message">{{ form.name.errors.0 }}</div>
+                {% endif %}
+            </div>
+            <button type="submit" class="submit-btn">
+                Create Organization
+            </button>
+        </form>
+    </div>
 </div>
+
+<style>
+    .home-container {
+        max-width: 2000px;
+        margin: 2rem auto;
+        padding: 0 2rem;
+        width: 95%;
+    }
+
+    .form-container {
+        max-width: 500px;
+        margin: 0 auto;
+    }
+
+    .welcome-section {
+        text-align: center;
+        margin-bottom: 3rem;
+        padding-bottom: 1.5rem;
+        border-bottom: 1px solid var(--medium-blue-slate);
+    }
+
+    .welcome-section h1 {
+        color: var(--text-light);
+        font-size: 2.5rem;
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 1rem;
+    }
+
+    .welcome-section h1 i {
+        color: var(--periwinkle);
+    }
+
+    .welcome-message {
+        color: var(--text-muted);
+        font-size: 1.2rem;
+    }
+
+    .create-org-form {
+        background: linear-gradient(to bottom, rgba(36, 36, 68, 0.95) 0%, rgba(26, 26, 46, 0.95) 100%);
+        padding: 2rem;
+        border-radius: 12px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        border: 1px solid var(--medium-blue-slate);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .form-group {
+        margin-bottom: 1.5rem;
+        width: 100%;
+    }
+
+    .form-group label {
+        display: block;
+        color: var(--text-light);
+        margin-bottom: 0.5rem;
+        font-size: 1.1rem;
+    }
+
+    .form-group input {
+        width: 100%;
+        padding: 0.8rem 1rem;
+        background-color: var(--darker-bg);
+        border: 1px solid var(--medium-blue-slate);
+        border-radius: 8px;
+        color: var(--text-light);
+        font-size: 1rem;
+        transition: all 0.3s ease;
+    }
+
+    .form-group input:focus {
+        outline: none;
+        border-color: var(--periwinkle);
+        box-shadow: 0 0 0 2px var(--medium-blue-slate);
+    }
+
+    .error-message {
+        color: #ff6b6b;
+        margin-top: 0.5rem;
+        font-size: 0.9rem;
+    }
+
+    .submit-btn {
+        width: 200px;
+        padding: 0.75rem;
+        background: linear-gradient(to right, var(--medium-blue-slate) 0%, var(--periwinkle) 100%);
+        color: var(--white);
+        border: none;
+        border-radius: 8px;
+        font-size: 1rem;
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        position: relative;
+        transform: translateY(0);
+        white-space: nowrap;
+    }
+
+    .submit-btn::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        border-radius: 8px;
+        padding: 2px;
+        background: linear-gradient(to right, var(--medium-blue-slate) 0%, var(--periwinkle) 100%);
+        -webkit-mask: 
+            linear-gradient(#fff 0 0) content-box, 
+            linear-gradient(#fff 0 0);
+        -webkit-mask-composite: xor;
+        mask-composite: exclude;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
+
+    .submit-btn:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+    }
+
+    .submit-btn:hover::before {
+        opacity: 1;
+    }
+
+    .submit-btn:active {
+        transform: translateY(0);
+    }
+
+    @media (max-width: 768px) {
+        .home-container {
+            padding: 0 1rem;
+        }
+
+        .create-org-form {
+            padding: 1.5rem;
+        }
+
+        .welcome-section h1 {
+            font-size: 1.75rem;
+        }
+
+        .form-actions {
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .submit-btn {
+            width: 150px;
+        }
+    }
+</style>
 {% endblock %}

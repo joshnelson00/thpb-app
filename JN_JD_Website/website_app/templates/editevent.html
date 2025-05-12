@@ -2,42 +2,814 @@
 {% load static %}
 
 {% block content %}
-<div class="content">
-    <h1>Edit Event: {{ event.name }}</h1>
-    <div class="event-details-container">
-        <div class="event-date-block">
-            {{ event.date.day }} <!-- Day of the event -->
-            <div class="event-date-text">{{ event.date|date:"b" }}</div> <!-- Month abbreviation -->
-        </div>
-        <div class="event-description-container">
-            {{ event.description }}
-        </div>
+<div class="home-container">
+    <div class="welcome-section">
+        <h1><i class="fas fa-edit"></i> Edit Event: {{ event.name }}</h1>
+        <p class="welcome-message">Modify event details and manage assigned users.</p>
     </div>
-    <div class="movable-group-container">
-        <div class="movable-group-container-wrapper">
-            <h2>Available Groups</h2>
-            <div class="movable-groups" id="available-groups">
-                <div class="movable-group" id="group1">Group A</div>
-                <div class="movable-group" id="group2">Group B</div>
-                <div class="movable-group" id="group3">Group C</div>
+
+    <form id="editEventForm" class="dashboard-grid">
+        {% csrf_token %}
+        <!-- Event Details Card -->
+        <div class="dashboard-card">
+            <div class="card-header">
+                <h2><i class="fas fa-info-circle"></i> Event Details</h2>
+            </div>
+            <div class="card-content">
+                <div class="event-form">
+                    <div class="form-group">
+                        <label for="event-name">Event Name</label>
+                        <input type="text" id="event-name" name="name" value="{{ event.name }}" required>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="event-date">Date</label>
+                            <input type="date" id="event-date" name="date" value="{{ event.date|date:'Y-m-d' }}" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="event-time">Time</label>
+                            <input type="time" id="event-time" name="time" value="{{ event.time|time:'H:i' }}" required>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="event-location">Location</label>
+                        <input type="text" id="event-location" name="location" value="{{ event.location }}" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="event-description">Description</label>
+                        <textarea id="event-description" name="description" rows="4" required>{{ event.description }}</textarea>
+                    </div>
+
+                    <!-- Geofence Section -->
+                    <div class="form-group">
+                        <div class="form-label">
+                            <i class="fas fa-map"></i>
+                            Event Location
+                        </div>
+                        <div id="map" class="map-container"></div>
+                        
+                        <div class="form-group">
+                            <div class="form-label">
+                                <i class="fas fa-ruler"></i>
+                                Radius (meters)
+                            </div>
+                            <div class="radius-control">
+                                <input type="range" id="radiusSlider" min="10" max="10000" step="10" value="{{ event.geofence_radius|default:50 }}">
+                                <span id="radiusValue">{{ event.geofence_radius|default:50 }}</span>
+                                <input type="hidden" name="radius" id="radiusInput" value="{{ event.geofence_radius|default:50 }}">
+                            </div>
+                        </div>
+                        
+                        <!-- Hidden latitude and longitude fields -->
+                        <div class="visually-hidden">
+                            <input type="hidden" name="latitude" id="latitude" value="{{ event.geofence_latitude }}">
+                            <input type="hidden" name="longitude" id="longitude" value="{{ event.geofence_longitude }}">
+                        </div>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit" class="action-btn save">
+                            <i class="fas fa-save"></i>
+                            Save Changes
+                        </button>
+                        <button type="reset" class="action-btn reset">
+                            <i class="fas fa-undo"></i>
+                            Reset Changes
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
-    
-        <div class="movable-group-container-wrapper">
-            <h2>Assigned Groups</h2>
-            <div class="movable-groups" id="assigned-groups">
-                <div class="movable-group" id="group4">Group D</div>
-                <div class="movable-group" id="group5">Group E</div>
-                <div class="movable-group" id="group6">Group F</div>
-                <div class="movable-group" id="group7">Group G</div>
-                <div class="movable-group" id="group8">Group H</div>
-                <div class="movable-group" id="group9">Group I</div>
-                <div class="movable-group" id="group10">Group J</div>
-                <div class="movable-group" id="group11">Group K</div>
+
+        <!-- Users Management Card -->
+        <div class="dashboard-card">
+            <div class="card-header">
+                <h2><i class="fas fa-users"></i> Manage Users</h2>
+            </div>
+            <div class="card-content">
+                <div class="users-management-two-cols">
+                    <div class="user-container available-users" id="available-users">
+                        <h3>Available Users</h3>
+                        <div class="user-list" id="available-list">
+                            {% for user in available_users %}
+                            <div class="user-item not-attending" draggable="true" data-user-id="{{ user.id }}">
+                                <span class="user-name">{{ user.name }}</span>
+                                <span class="attendance-status not-attending"><i class="fas fa-times"></i></span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="user-container attending-users" id="attending-users">
+                        <h3>Attending Users</h3>
+                        <div class="user-list" id="attending-list">
+                            {% for user in attending_users %}
+                            <div class="user-item attending" draggable="true" data-user-id="{{ user.id }}">
+                                <span class="user-name">{{ user.name }}</span>
+                                <span class="attendance-status attending"><i class="fas fa-check"></i></span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
-    </div>
-    
-    
+
+        <!-- Delete Event Card -->
+        <div class="dashboard-card">
+            <div class="card-header">
+                <h2><i class="fas fa-trash-alt"></i> Danger Zone</h2>
+            </div>
+            <div class="card-content">
+                <div class="delete-section">
+                    <p>Once you delete an event, there is no going back. Please be certain.</p>
+                    <button type="button" id="deleteEvent" class="action-btn delete">
+                        <i class="fas fa-trash-alt"></i>
+                        Delete Event
+                    </button>
+                </div>
+            </div>
+        </div>
+    </form>
 </div>
+
+<!-- Leaflet CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('editEventForm');
+    
+    // Initialize map with event's current location or default coordinates
+    const initialLat = {{ event.geofence_latitude|default:"33.51314706106841" }};
+    const initialLng = {{ event.geofence_longitude|default:"-112.12542386469842" }};
+    const initialRadius = {{ event.geofence_radius|default:50 }};
+    
+    const map = L.map('map').setView([initialLat, initialLng], 15);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    let marker = null;
+    let circle = null;
+    const radiusSlider = document.getElementById('radiusSlider');
+    const radiusValue = document.getElementById('radiusValue');
+    const radiusInput = document.getElementById('radiusInput');
+    const latitudeInput = document.getElementById('latitude');
+    const longitudeInput = document.getElementById('longitude');
+
+    // Set initial marker and circle
+    marker = L.marker([initialLat, initialLng], {
+        draggable: true
+    }).addTo(map);
+    circle = L.circle([initialLat, initialLng], {
+        radius: initialRadius,
+        color: 'red',
+        fillColor: '#f03',
+        fillOpacity: 0.2
+    }).addTo(map);
+
+    // Add marker drag event handlers
+    marker.on('dragstart', function(e) {
+        if (circle) {
+            circle.setStyle({ fillOpacity: 0.1 });
+        }
+    });
+
+    marker.on('drag', function(e) {
+        const lat = e.target.getLatLng().lat;
+        const lng = e.target.getLatLng().lng;
+        
+        if (circle) {
+            circle.setLatLng([lat, lng]);
+        }
+    });
+
+    marker.on('dragend', function(e) {
+        const lat = e.target.getLatLng().lat;
+        const lng = e.target.getLatLng().lng;
+        
+        latitudeInput.value = lat.toFixed(6);
+        longitudeInput.value = lng.toFixed(6);
+        
+        if (circle) {
+            circle.setLatLng([lat, lng]);
+            circle.setStyle({ fillOpacity: 0.2 });
+        }
+    });
+
+    // Update radius display and hidden input
+    radiusSlider.addEventListener('input', function() {
+        const value = this.value;
+        radiusValue.textContent = value;
+        radiusInput.value = value;
+        if (circle) {
+            circle.setRadius(parseInt(value));
+        }
+    });
+
+    // Handle map clicks
+    map.on('click', function(e) {
+        const lat = e.latlng.lat;
+        const lng = e.latlng.lng;
+        
+        latitudeInput.value = lat.toFixed(6);
+        longitudeInput.value = lng.toFixed(6);
+        
+        if (marker) {
+            map.removeLayer(marker);
+        }
+        if (circle) {
+            map.removeLayer(circle);
+        }
+        
+        marker = L.marker([lat, lng]).addTo(map);
+        circle = L.circle([lat, lng], {
+            radius: parseInt(radiusSlider.value),
+            color: 'red',
+            fillColor: '#f03',
+            fillOpacity: 0.2
+        }).addTo(map);
+    });
+
+    // Drag and Drop Functionality
+    const availableList = document.getElementById('available-list');
+    const attendingList = document.getElementById('attending-list');
+    const eventId = {{ event.id }};
+
+    // Add drag and drop event listeners to both lists
+    [availableList, attendingList].forEach(list => {
+        list.addEventListener('dragover', e => {
+            e.preventDefault();
+            list.classList.add('drag-over');
+        });
+
+        list.addEventListener('dragleave', () => {
+            list.classList.remove('drag-over');
+        });
+
+        list.addEventListener('drop', e => {
+            e.preventDefault();
+            list.classList.remove('drag-over');
+            
+            const userItem = document.querySelector('.dragging');
+            if (!userItem) return;
+
+            const userId = userItem.dataset.userId;
+            const action = list.id === 'attending-list' ? 'add' : 'remove';
+
+            // Update the UI immediately
+            userItem.classList.remove('dragging');
+            list.appendChild(userItem);
+            updateUserItemStatus(userItem, action);
+
+            // Send update to server
+            updateEventAttendee(userId, action);
+        });
+    });
+
+    // Add drag event listeners to all user items
+    document.querySelectorAll('.user-item').forEach(item => {
+        item.addEventListener('dragstart', () => {
+            item.classList.add('dragging');
+        });
+
+        item.addEventListener('dragend', () => {
+            item.classList.remove('dragging');
+        });
+    });
+
+    // Helper function to update user item appearance
+    function updateUserItemStatus(userItem, action) {
+        const statusSpan = userItem.querySelector('.attendance-status');
+        if (action === 'add') {
+            userItem.classList.remove('not-attending');
+            userItem.classList.add('attending');
+            statusSpan.className = 'attendance-status attending';
+            statusSpan.innerHTML = '<i class="fas fa-check"></i>';
+        } else {
+            userItem.classList.remove('attending');
+            userItem.classList.add('not-attending');
+            statusSpan.className = 'attendance-status not-attending';
+            statusSpan.innerHTML = '<i class="fas fa-times"></i>';
+        }
+    }
+
+    // Function to update event attendee on server
+    function updateEventAttendee(userId, action) {
+        fetch('/update_event_attendee/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify({
+                user_id: userId,
+                event_id: eventId,
+                action: action
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (!data.success) {
+                console.error('Error updating attendee:', data.error);
+                // Optionally revert the UI change if the server update failed
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            // Optionally revert the UI change if the server update failed
+        });
+    }
+
+    // Form submission handler
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        // Validate required fields
+        const requiredFields = ['name', 'description', 'date', 'location', 'latitude', 'longitude', 'radius'];
+        let isValid = true;
+        
+        requiredFields.forEach(fieldName => {
+            const field = form.querySelector(`[name="${fieldName}"]`);
+            if (field && !field.value) {
+                isValid = false;
+                field.classList.add('error');
+            } else if (field) {
+                field.classList.remove('error');
+            }
+        });
+        
+        if (isValid) {
+            // Create FormData object from the form
+            const formData = new FormData(form);
+            
+            // Add the organization ID
+            formData.append('organization', '{{ event.organization.id }}');
+            
+            // Add the latitude, longitude, and radius
+            formData.append('latitude', latitudeInput.value);
+            formData.append('longitude', longitudeInput.value);
+            formData.append('radius', radiusInput.value);
+
+            fetch("{% url 'editevent' event.id %}", {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert(data.message || 'Event updated successfully');
+                    window.location.href = "{% url 'viewevents' %}";
+                } else {
+                    alert('Error updating event: ' + (data.error || 'Unknown error occurred'));
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error updating event: ' + error);
+            });
+        } else {
+            alert('Please fill in all required fields');
+        }
+    });
+
+    // Helper function to get CSRF token
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+});
+</script>
+
+<style>
+    .home-container {
+        max-width: 1080px;
+        margin: 2rem auto;
+        padding: 0 2rem;
+        width: 72%;
+    }
+
+    .welcome-section {
+        text-align: center;
+        margin-bottom: 2rem;
+        padding-bottom: 1.5rem;
+        border-bottom: 1px solid var(--medium-blue-slate);
+    }
+
+    .welcome-section h1 {
+        color: var(--text-light);
+        font-size: 2.5rem;
+        margin-bottom: 0.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.75rem;
+    }
+
+    .welcome-message {
+        color: var(--text-muted);
+        font-size: 1.1rem;
+    }
+
+    .dashboard-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 2rem;
+        width: 100%;
+        margin: 0 auto;
+    }
+
+    .dashboard-card {
+        background: linear-gradient(to bottom, var(--card-bg) 0%, var(--dark-bg) 100%);
+        border-radius: 16px;
+        padding: 2rem;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+        border: 1px solid var(--medium-blue-slate);
+    }
+
+    .card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid var(--medium-blue-slate);
+    }
+
+    .card-header h2 {
+        color: var(--text-light);
+        font-size: 1.5rem;
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .card-header h2 i {
+        color: var(--periwinkle);
+    }
+
+    /* Form Styles */
+    .event-form {
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+    }
+
+    .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .form-row {
+        display: flex;
+        gap: 1rem;
+    }
+
+    .form-group label {
+        color: var(--text-light);
+        font-size: 1rem;
+        font-weight: 500;
+    }
+
+    .form-group input,
+    .form-group textarea {
+        padding: 0.75rem;
+        border: 1px solid var(--medium-blue-slate);
+        border-radius: 8px;
+        background: var(--darker-bg);
+        color: var(--text-light);
+        font-size: 1rem;
+        transition: all 0.3s ease;
+    }
+
+    .form-group input:focus,
+    .form-group textarea:focus {
+        border-color: var(--periwinkle);
+        outline: none;
+        box-shadow: 0 0 0 2px rgba(102, 102, 255, 0.2);
+    }
+
+    .form-actions {
+        display: flex;
+        gap: 1rem;
+        margin-top: 1rem;
+    }
+
+    .action-btn {
+        padding: 0.75rem 1.5rem;
+        border-radius: 8px;
+        border: none;
+        cursor: pointer;
+        font-size: 1rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.75rem;
+        transition: all 0.3s ease;
+    }
+
+    .action-btn.save {
+        background: var(--medium-blue-slate);
+        color: var(--white);
+    }
+
+    .action-btn.save:hover {
+        background: var(--periwinkle);
+        transform: translateY(-2px);
+    }
+
+    .action-btn.reset {
+        background: var(--darker-bg);
+        color: var(--text-light);
+        border: 1px solid var(--medium-blue-slate);
+    }
+
+    .action-btn.reset:hover {
+        background: var(--card-bg);
+        border-color: var(--periwinkle);
+    }
+
+    .action-btn.delete {
+        background: #dc3545;
+        color: var(--white);
+    }
+
+    .action-btn.delete:hover {
+        background: #c82333;
+        transform: translateY(-2px);
+    }
+
+    /* Users Management Styles */
+    .users-management-two-cols {
+        display: flex;
+        gap: 1.5rem;
+        justify-content: space-between;
+        width: 100%;
+    }
+
+    .user-container {
+        flex: 1;
+        background: rgba(26, 26, 46, 0.95);
+        border-radius: 12px;
+        padding: 1.25rem;
+        border: 1px solid var(--medium-blue-slate);
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        transition: all 0.3s ease;
+    }
+
+    .user-container:hover {
+        border-color: var(--periwinkle);
+        box-shadow: 0 4px 12px rgba(102, 102, 255, 0.1);
+    }
+
+    .user-container h3 {
+        color: var(--text-light);
+        margin-bottom: 1rem;
+        font-size: 1.1rem;
+        border-bottom: 1px solid var(--medium-blue-slate);
+        padding-bottom: 0.5rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .user-container h3::before {
+        content: '';
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--periwinkle);
+    }
+
+    .user-list {
+        min-height: 150px;
+        max-height: 400px;
+        overflow-y: auto;
+        padding: 0.5rem;
+        background: rgba(0, 0, 0, 0.1);
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .user-item {
+        background: rgba(72, 72, 102, 0.95);
+        color: var(--white);
+        padding: 0.5rem 0.75rem;
+        border-radius: 6px;
+        cursor: grab;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        transition: all 0.2s ease;
+        border: 1px solid transparent;
+        font-size: 0.9rem;
+        user-select: none;
+    }
+
+    .user-item.attending {
+        background: rgba(40, 167, 69, 0.15);
+        border: 1px solid rgba(40, 167, 69, 0.3);
+    }
+
+    .user-item.not-attending {
+        background: rgba(220, 53, 69, 0.08);
+        border: 1px solid rgba(220, 53, 69, 0.2);
+    }
+
+    .user-item.dragging {
+        opacity: 0.5;
+        transform: scale(0.98);
+        cursor: grabbing;
+    }
+
+    .user-item:hover {
+        background: var(--periwinkle);
+        color: var(--rich-black);
+        transform: translateY(-1px);
+    }
+
+    .attendance-status {
+        margin-left: auto;
+        font-size: 0.9rem;
+        display: flex;
+        align-items: center;
+        padding: 0.25rem;
+        border-radius: 4px;
+    }
+
+    .attendance-status.attending i {
+        color: #28a745;
+    }
+
+    .attendance-status.not-attending i {
+        color: #dc3545;
+    }
+
+    .user-list.drag-over {
+        background: rgba(102, 102, 255, 0.08);
+        border: 2px dashed var(--periwinkle);
+    }
+
+    /* Mobile Responsive Styles */
+    @media (max-width: 900px) {
+        .users-management-two-cols {
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .user-container {
+            max-width: none;
+        }
+    }
+
+    .delete-section {
+        text-align: center;
+        padding: 1rem;
+        background: rgba(26, 26, 46, 0.85);
+        border-radius: 12px;
+        border: 1px solid var(--medium-blue-slate);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        position: relative;
+        z-index: 1;
+    }
+    .delete-section p {
+        color: var(--text-muted);
+        margin-bottom: 2rem;
+    }
+    .action-btn.delete {
+        background: #dc3545;
+        color: var(--white);
+        padding: 0.75rem 1.5rem;
+        border-radius: 25px;
+        border: none;
+        cursor: pointer;
+        font-size: 1rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.75rem;
+        transition: all 0.3s ease;
+    }
+    .action-btn.delete:hover {
+        background: #c82333;
+        transform: translateY(-2px);
+    }
+
+    .map-container {
+        height: 40vh;
+        width: 100%;
+        max-width: 600px;
+        margin: 1rem auto;
+        border-radius: 8px;
+        overflow: hidden;
+        border: 1px solid var(--medium-blue-slate);
+    }
+
+    .radius-control {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.5rem;
+        margin-top: 0.5rem;
+        max-width: 600px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    #radiusSlider {
+        width: 100%;
+        height: 6px;
+        background: var(--darker-bg);
+        border-radius: 3px;
+        outline: none;
+        -webkit-appearance: none;
+        cursor: pointer;
+        border: 1px solid var(--medium-blue-slate);
+    }
+
+    #radiusSlider::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 18px;
+        height: 18px;
+        background: linear-gradient(to right, var(--medium-blue-slate) 0%, var(--periwinkle) 100%);
+        border-radius: 50%;
+        cursor: pointer;
+        border: 2px solid var(--white);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        transition: all 0.2s ease;
+    }
+
+    #radiusSlider::-webkit-slider-thumb:hover {
+        transform: scale(1.1);
+    }
+
+    #radiusSlider::-moz-range-thumb {
+        width: 18px;
+        height: 18px;
+        background: linear-gradient(to right, var(--medium-blue-slate) 0%, var(--periwinkle) 100%);
+        border-radius: 50%;
+        cursor: pointer;
+        border: 2px solid var(--white);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        transition: all 0.2s ease;
+    }
+
+    #radiusSlider::-moz-range-thumb:hover {
+        transform: scale(1.1);
+    }
+
+    #radiusValue {
+        color: var(--text-light);
+        font-weight: 500;
+        font-size: 1.1rem;
+        text-align: center;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.25rem;
+    }
+
+    #radiusValue::after {
+        content: "meters";
+        font-size: 0.9rem;
+        color: var(--text-muted);
+    }
+
+    .visually-hidden {
+        position: absolute !important;
+        height: 1px;
+        width: 1px;
+        overflow: hidden;
+        clip: rect(1px, 1px, 1px, 1px);
+        white-space: nowrap;
+    }
+</style>
 {% endblock %}

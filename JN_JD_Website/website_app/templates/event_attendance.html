@@ -1,0 +1,302 @@
+{% extends 'index.html' %}
+{% load static %}
+
+{% block title %}Event Attendance{% endblock %}
+
+{% block content %}
+<div class="home-container">
+    <div class="welcome-section">
+        <h1><i class="fas fa-clipboard-list"></i> Event Attendance: {{ event.name }}</h1>
+        <p class="welcome-message">View attendance records for this event.</p>
+    </div>
+
+    <div class="dashboard-grid">
+        <!-- Event Details Card -->
+        <div class="dashboard-card">
+            <div class="card-header">
+                <h2><i class="fas fa-info-circle"></i> Event Details</h2>
+            </div>
+            <div class="card-content">
+                <div class="event-info">
+                    <p><i class="fas fa-calendar"></i> Date: {{ event.date|date:"F j, Y" }}</p>
+                    <p><i class="fas fa-clock"></i> Time: {{ event.time|time:"g:i A" }}</p>
+                    <p><i class="fas fa-map-marker-alt"></i> Location: {{ event.location }}</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Attendance Statistics Card -->
+        <div class="dashboard-card">
+            <div class="card-header">
+                <h2><i class="fas fa-chart-pie"></i> Attendance Statistics</h2>
+            </div>
+            <div class="card-content">
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-value">{{ total_attended }}</div>
+                        <div class="stat-label">Attended</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">{{ total_expected }}</div>
+                        <div class="stat-label">Expected</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">{{ attendance_rate|floatformat:1 }}%</div>
+                        <div class="stat-label">Attendance Rate</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Attendance Lists Card -->
+        <div class="dashboard-card">
+            <div class="card-header">
+                <h2><i class="fas fa-users"></i> Attendance Details</h2>
+            </div>
+            <div class="card-content">
+        <div class="attendance-lists">
+                    <!-- Present Users -->
+                    <div class="attendance-section">
+                        <h3><i class="fas fa-check-circle"></i> Present ({{ attended|length }})</h3>
+                <div class="user-list">
+                            {% if attended %}
+                    {% for user in attended %}
+                                    <div class="user-item present">
+                                        <i class="fas fa-user"></i>
+                                        {{ user.f_name }} {{ user.l_name }}
+                    </div>
+                                {% endfor %}
+                            {% else %}
+                                <p class="no-users">No users have checked in yet.</p>
+                            {% endif %}
+                </div>
+            </div>
+
+                    <!-- Unexpected Attendees -->
+                    {% if unexpected_attendees %}
+                    <div class="attendance-section">
+                        <h3><i class="fas fa-user-plus"></i> Unexpected Attendees ({{ unexpected_attendees|length }})</h3>
+                        <div class="user-list">
+                            {% for user in unexpected_attendees %}
+                                <div class="user-item unexpected">
+                                    <i class="fas fa-user"></i>
+                                    {{ user.f_name }} {{ user.l_name }}
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Absent Users -->
+                    <div class="attendance-section">
+                        <h3><i class="fas fa-times-circle"></i> Absent ({{ absent|length }})</h3>
+                <div class="user-list">
+                            {% if absent %}
+                    {% for user in absent %}
+                                    <div class="user-item absent">
+                                        <i class="fas fa-user"></i>
+                                        {{ user.f_name }} {{ user.l_name }}
+                                    </div>
+                                {% endfor %}
+                            {% else %}
+                                <p class="no-users">No absent users.</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .home-container {
+        max-width: 1080px;
+        margin: 2rem auto;
+        padding: 0 2rem;
+        width: 72%;
+    }
+
+    .welcome-section {
+        text-align: center;
+        margin-bottom: 2rem;
+        padding-bottom: 1.5rem;
+        border-bottom: 1px solid var(--medium-blue-slate);
+    }
+
+    .welcome-section h1 {
+        color: var(--text-light);
+        font-size: 2.5rem;
+        margin-bottom: 0.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.75rem;
+    }
+
+    .welcome-section h1 i {
+        color: var(--periwinkle);
+    }
+
+    .welcome-message {
+        color: var(--text-muted);
+        font-size: 1.1rem;
+    }
+
+    .dashboard-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 2rem;
+    }
+
+    .dashboard-card {
+        background: linear-gradient(to bottom, var(--card-bg) 0%, var(--dark-bg) 100%);
+        border-radius: 16px;
+        padding: 2rem;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+        border: 1px solid var(--medium-blue-slate);
+    }
+
+    .card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid var(--medium-blue-slate);
+    }
+
+    .card-header h2 {
+        color: var(--text-light);
+        font-size: 1.5rem;
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .card-header h2 i {
+        color: var(--periwinkle);
+    }
+
+    .event-info {
+        color: var(--text-light);
+        font-size: 1.1rem;
+    }
+
+    .event-info p {
+        margin: 0.5rem 0;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .event-info i {
+        color: var(--periwinkle);
+        width: 20px;
+    }
+
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 2rem;
+    }
+
+    .stat-item {
+        text-align: center;
+        padding: 1.5rem;
+        background: var(--darker-bg);
+        border-radius: 12px;
+        border: 1px solid var(--medium-blue-slate);
+    }
+
+    .stat-value {
+        font-size: 2rem;
+        font-weight: bold;
+        color: var(--periwinkle);
+        margin-bottom: 0.5rem;
+    }
+
+    .stat-label {
+        color: var(--text-muted);
+        font-size: 1rem;
+    }
+
+    .attendance-lists {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 2rem;
+    }
+
+    .attendance-section h3 {
+        color: var(--text-light);
+        font-size: 1.2rem;
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .attendance-section h3 i {
+        color: var(--periwinkle);
+    }
+
+    .user-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .user-item {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.75rem;
+        background: var(--darker-bg);
+        border-radius: 8px;
+        color: var(--text-light);
+        border: 1px solid var(--medium-blue-slate);
+    }
+
+    .user-item i {
+        color: var(--periwinkle);
+    }
+
+    .user-item.present {
+        border-left: 4px solid var(--celadon);
+    }
+
+    .user-item.absent {
+        border-left: 4px solid var(--red);
+    }
+
+    .user-item.unexpected {
+        border-left: 4px solid var(--periwinkle);
+    }
+
+    .no-users {
+        color: var(--text-muted);
+        font-style: italic;
+        text-align: center;
+        padding: 1rem;
+    }
+
+    @media (max-width: 768px) {
+        .home-container {
+            padding: 0 1rem;
+            margin: 1rem auto;
+            width: 85%;
+        }
+
+        .stats-grid {
+            grid-template-columns: 1fr;
+            gap: 1rem;
+        }
+
+        .attendance-lists {
+            grid-template-columns: 1fr;
+            gap: 1.5rem;
+        }
+    }
+</style>
+{% endblock %} 

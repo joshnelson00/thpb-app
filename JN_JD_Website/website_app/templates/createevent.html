@@ -2,80 +2,706 @@
 {% load static %}
 
 {% block content %}
-<div class="content">
-    <h1>Create Event</h1>
-    <form method="post" class="form" id="create-event-form">
-        {% csrf_token %}
-        
-        <div class="form-group">
-            {{ form.name }}
-        </div>
-        <div class="form-group">
-            {{ form.description }}
-        </div>
-        <div class="form-group">
-            {{ form.date }}
-        </div>
-        <div class="form-group">
-            {{ form.location }}
-        </div>
-        <div class="form-group">
-            {{ form.organization }}
-        </div>
+<div class="home-container">
+    <div class="welcome-section">
+        <h1><i class="fas fa-plus-circle"></i> Create New Event</h1>
+        <p class="welcome-message">Fill out the details below to create a new event.</p>
+    </div>
 
-        {% if form.errors %}
-            <div class="errors">
-                {% for field in form %}
-                    {% if field.errors %}
-                        <div class="error">
-                            {% for error in field.errors %}
-                                <p>{{ error }}</p>
-                            {% endfor %}
+    <div class="dashboard-grid">
+        <div class="dashboard-card">
+            <div class="card-header">
+                <h2><i class="fas fa-info-circle"></i> Event Details</h2>
+            </div>
+            <div class="card-content">
+                <form method="post" class="event-form" id="eventForm">
+                    {% csrf_token %}
+                    
+                    <div class="form-group">
+                        <div class="form-label">
+                            <i class="fas fa-tag"></i>
+                            Event Name
                         </div>
-                    {% endif %}
-                {% endfor %}
-            </div>
-        {% endif %}
+                        {{ form.name }}
+                        {% if form.name.errors %}
+                        <div class="error">{{ form.name.errors }}</div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="form-group">
+                        <div class="form-label">
+                            <i class="fas fa-align-left"></i>
+                            Description
+                        </div>
+                        {{ form.description }}
+                        {% if form.description.errors %}
+                        <div class="error">{{ form.description.errors }}</div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="form-group date-time-container">
+                        <div class="date-time-group">
+                            <div class="form-label">
+                                <i class="fas fa-calendar" style="color: var(--white);"></i>
+                                Date
+                            </div>
+                            {{ form.date }}
+                            {% if form.date.errors %}
+                            <div class="error">{{ form.date.errors }}</div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="date-time-group">
+                            <div class="form-label">
+                                <i class="fas fa-clock" style="color: var(--white);"></i>
+                                Time
+                            </div>
+                            {{ form.time }}
+                            {% if form.time.errors %}
+                            <div class="error">{{ form.time.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <div class="form-label">
+                            <i class="fas fa-map-marker-alt"></i>
+                            Location
+                        </div>
+                        {{ form.location }}
+                        {% if form.location.errors %}
+                        <div class="error">{{ form.location.errors }}</div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="form-group">
+                        <div class="form-label">
+                            <i class="fas fa-building"></i>
+                            Organization
+                        </div>
+                        {{ form.organization }}
+                        {% if form.organization.errors %}
+                        <div class="error">{{ form.organization.errors }}</div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="form-group">
+                        <div class="form-label">
+                            <i class="fas fa-users"></i>
+                            Groups
+                        </div>
+                        <div id="groups-container" class="groups-checkbox-container">
+                            {{ form.groups }}
+                        </div>
+                        {% if form.groups.errors %}
+                        <div class="error">{{ form.groups.errors }}</div>
+                        {% endif %}
+                    </div>
 
-        <div class="form-group">
-            <label for="id_groups">Select Groups</label>
-            <div id="id_groups">
-                <!-- Dynamically populated checkboxes will appear here -->
+                    <!-- Geofence Section -->
+                    <div class="form-group">
+                        <div class="form-label">
+                            <i class="fas fa-map"></i>
+                            Event Location
+                        </div>
+                        <div id="map" class="map-container"></div>
+                        
+                        <div class="form-group">
+                            <div class="form-label">
+                                <i class="fas fa-ruler"></i>
+                                Radius (meters)
+                            </div>
+                            <div class="radius-control">
+                                <input type="range" id="radiusSlider" min="10" max="10000" step="10" value="50">
+                                <span id="radiusValue">50</span>
+                                <input type="hidden" name="radius" id="radiusInput" value="50">
+                            </div>
+                        </div>
+                        
+                        <!-- Hidden latitude and longitude fields -->
+                        <div class="visually-hidden">
+                            {{ form.latitude }}
+                            {{ form.longitude }}
+                        </div>
+                    </div>
+                    
+                    <input type="hidden" name="timezone" id="timezone" value="{{ user_timezone }}">
+                    
+                    <button type="submit" class="submit-button">
+                        Create Event
+                    </button>
+                </form>
             </div>
         </div>
-
-        <button type="submit">Submit</button>
-    </form>
+    </div>
 </div>
 
+<!-- Leaflet CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+
 <script>
-    document.getElementById('id_organization').addEventListener('change', function () {
-        const orgId = this.value;
-        fetch(`/get_groups_by_org/${orgId}/`)
-            .then(response => response.json())
-            .then(data => {
-                const groupSelect = document.getElementById('id_groups');
-                groupSelect.innerHTML = '';  // Clear any previous options
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('eventForm');
+    
+    // Initialize map centered on specific coordinates
+    const map = L.map('map').setView([33.51314706106841, -112.12542386469842], 15);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
 
-                data.groups.forEach(group => {
-                    const checkbox = document.createElement('input');
-                    checkbox.type = 'checkbox';
-                    checkbox.name = 'groups';  // Ensure the name attribute is correct
-                    checkbox.value = group.id;
-                    checkbox.id = `group_${group.id}`;
+    let marker = null;
+    let circle = null;
+    const radiusSlider = document.getElementById('radiusSlider');
+    const radiusValue = document.getElementById('radiusValue');
+    const radiusInput = document.getElementById('radiusInput');
+    const latitudeInput = document.getElementById('id_latitude');
+    const longitudeInput = document.getElementById('id_longitude');
+    const organizationSelect = document.querySelector('select[name="organization"]');
+    const groupsContainer = document.getElementById('groups-container');
 
-                    const label = document.createElement('label');
-                    label.setAttribute('for', `group_${group.id}`);
-                    label.innerText = group.name;
+    // Set initial marker and circle
+    marker = L.marker([33.51314706106841, -112.12542386469842], {
+        draggable: true
+    }).addTo(map);
+    circle = L.circle([33.51314706106841, -112.12542386469842], {
+        radius: 50,
+        color: 'red',
+        fillColor: '#f03',
+        fillOpacity: 0.2
+    }).addTo(map);
 
-                    const div = document.createElement('div');
-                    div.appendChild(checkbox);
-                    div.appendChild(label);
-                    groupSelect.appendChild(div);
-                });
-            });
+    // Set initial form values
+    latitudeInput.value = (33.51314706106841).toFixed(6);
+    longitudeInput.value = (-112.12542386469842).toFixed(6);
+    radiusInput.value = 50;
+
+    // Add marker drag event handlers
+    marker.on('dragstart', function(e) {
+        // Make circle semi-transparent during drag
+        if (circle) {
+            circle.setStyle({ fillOpacity: 0.1 });
+        }
     });
+
+    marker.on('drag', function(e) {
+        const lat = e.target.getLatLng().lat;
+        const lng = e.target.getLatLng().lng;
+        
+        // Update circle position during drag
+        if (circle) {
+            circle.setLatLng([lat, lng]);
+        }
+    });
+
+    marker.on('dragend', function(e) {
+        const lat = e.target.getLatLng().lat;
+        const lng = e.target.getLatLng().lng;
+        
+        // Update form inputs
+        latitudeInput.value = lat.toFixed(6);
+        longitudeInput.value = lng.toFixed(6);
+        
+        // Update circle position and restore opacity
+        if (circle) {
+            circle.setLatLng([lat, lng]);
+            circle.setStyle({ fillOpacity: 0.2 });
+        }
+    });
+
+    // Function to update groups based on organization
+    function updateGroups() {
+        const orgId = organizationSelect.value;
+        if (orgId) {
+            fetch(`/get_groups_by_org/${orgId}/`, {
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(data => {
+                groupsContainer.innerHTML = '';
+                
+                if (data.groups && data.groups.length > 0) {
+                    data.groups.forEach(group => {
+                        const groupDiv = document.createElement('div');
+                        groupDiv.className = 'group-checkbox-item';
+                        
+                        const checkbox = document.createElement('input');
+                        checkbox.type = 'checkbox';
+                        checkbox.name = 'groups';
+                        checkbox.value = group.id;
+                        checkbox.id = `group-${group.id}`;
+                        
+                        const label = document.createElement('label');
+                        label.htmlFor = `group-${group.id}`;
+                        label.textContent = group.name;
+                        
+                        groupDiv.appendChild(checkbox);
+                        groupDiv.appendChild(label);
+                        groupsContainer.appendChild(groupDiv);
+                    });
+                } else {
+                    groupsContainer.innerHTML = '<p>No groups available for this organization.</p>';
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching groups:', error);
+                groupsContainer.innerHTML = '<p>Error loading groups. Please try again.</p>';
+            });
+        } else {
+            groupsContainer.innerHTML = '<p>Please select an organization first.</p>';
+        }
+    }
+
+    // Add event listener for organization change
+    organizationSelect.addEventListener('change', updateGroups);
+
+    // Update radius display and hidden input
+    radiusSlider.addEventListener('input', function() {
+        const value = this.value;
+        radiusValue.textContent = value;
+        radiusInput.value = value;
+        if (circle) {
+            circle.setRadius(parseInt(value));
+        }
+    });
+
+    // Handle map clicks
+    map.on('click', function(e) {
+        const lat = e.latlng.lat;
+        const lng = e.latlng.lng;
+        
+        // Update form inputs
+        latitudeInput.value = lat.toFixed(6);
+        longitudeInput.value = lng.toFixed(6);
+        
+        // Remove existing marker and circle
+        if (marker) {
+            map.removeLayer(marker);
+        }
+        if (circle) {
+            map.removeLayer(circle);
+        }
+        
+        // Add new marker and circle
+        marker = L.marker([lat, lng]).addTo(map);
+        circle = L.circle([lat, lng], {
+            radius: parseInt(radiusSlider.value),
+            color: 'red',
+            fillColor: '#f03',
+            fillOpacity: 0.2
+        }).addTo(map);
+    });
+
+    // Form submission handler
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        // Validate required fields
+        const requiredFields = ['name', 'description', 'date', 'location', 'organization', 'latitude', 'longitude', 'radius'];
+        let isValid = true;
+        
+        requiredFields.forEach(fieldName => {
+            const field = form.querySelector(`[name="${fieldName}"]`);
+            if (field && !field.value) {
+                isValid = false;
+                field.classList.add('error');
+            } else if (field) {
+                field.classList.remove('error');
+            }
+        });
+        
+        if (isValid) {
+            form.submit();
+        } else {
+            alert('Please fill in all required fields');
+        }
+    });
+
+    // Set the timezone when the page loads
+    document.getElementById('timezone').value = Intl.DateTimeFormat().resolvedOptions().timeZone;
+});
 </script>
 
+<style>
+    .home-container {
+        max-width: 1000px;
+        margin: 1rem auto;
+        padding: 0 2rem;
+        width: auto;
+    }
 
+    .welcome-section {
+        text-align: center;
+        margin-bottom: 1rem;
+        margin-top: 1rem;
+        padding-bottom: 1.5rem;
+        border-bottom: 1px solid var(--medium-blue-slate);
+    }
+
+    .welcome-section h1 {
+        color: var(--text-light);
+        font-size: 2.5rem;
+        margin-bottom: 0.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.75rem;
+    }
+
+    .welcome-section h1 i {
+        color: var(--periwinkle);
+    }
+
+    .welcome-message {
+        color: var(--text-muted);
+        font-size: 1.1rem;
+    }
+
+    .dashboard-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 2rem;
+        width: 100%;
+        margin: 0 auto;
+    }
+
+    .dashboard-card {
+        background: linear-gradient(to bottom, rgba(36, 36, 68, 0.95) 0%, rgba(26, 26, 46, 0.95) 100%);
+        border-radius: 16px;
+        padding: 2rem;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+        border: 1px solid var(--medium-blue-slate);
+        max-width: 800px;
+        margin: 0 auto;
+    }
+
+    .card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid var(--medium-blue-slate);
+    }
+
+    .card-header h2 {
+        color: var(--text-light);
+        font-size: 1.5rem;
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .card-header h2 i {
+        color: var(--periwinkle);
+    }
+
+    .form-group {
+        margin: 1.5rem 0;
+    }
+
+    .form-label {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        color: var(--text-light);
+        font-weight: 500;
+        margin-bottom: 0.75rem;
+    }
+
+    .form-label i {
+        color: var(--periwinkle);
+        width: 16px;
+    }
+
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+        width: 100%;
+        max-width: 600px;
+        margin: 0 auto;
+        display: block;
+        padding: 0.75rem;
+        background: var(--darker-bg);
+        border: 1px solid var(--medium-blue-slate);
+        border-radius: 8px;
+        color: var(--text-light);
+        font-size: 1rem;
+        transition: all 0.3s ease;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+        border-color: var(--periwinkle);
+        outline: none;
+        box-shadow: 0 0 0 2px var(--medium-blue-slate);
+    }
+
+    .form-group textarea {
+        min-height: 120px;
+        resize: vertical;
+    }
+
+    .map-container {
+        height: 40vh;
+        width: 100%;
+        max-width: 600px;
+        margin: 1rem auto;
+        border-radius: 8px;
+        overflow: hidden;
+        border: 1px solid var(--medium-blue-slate);
+    }
+
+    .radius-control {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.5rem;
+        margin-top: 0.5rem;
+        max-width: 600px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    #radiusSlider {
+        width: 100%;
+        height: 6px;
+        background: var(--darker-bg);
+        border-radius: 3px;
+        outline: none;
+        -webkit-appearance: none;
+        cursor: pointer;
+        border: 1px solid var(--medium-blue-slate);
+    }
+
+    #radiusSlider::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 18px;
+        height: 18px;
+        background: linear-gradient(to right, var(--medium-blue-slate) 0%, var(--periwinkle) 100%);
+        border-radius: 50%;
+        cursor: pointer;
+        border: 2px solid var(--white);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        transition: all 0.2s ease;
+    }
+
+    #radiusSlider::-webkit-slider-thumb:hover {
+        transform: scale(1.1);
+    }
+
+    #radiusSlider::-moz-range-thumb {
+        width: 18px;
+        height: 18px;
+        background: linear-gradient(to right, var(--medium-blue-slate) 0%, var(--periwinkle) 100%);
+        border-radius: 50%;
+        cursor: pointer;
+        border: 2px solid var(--white);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        transition: all 0.2s ease;
+    }
+
+    #radiusSlider::-moz-range-thumb:hover {
+        transform: scale(1.1);
+    }
+
+    #radiusValue {
+        color: var(--text-light);
+        font-weight: 500;
+        font-size: 1.1rem;
+        text-align: center;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.25rem;
+    }
+
+    #radiusValue::after {
+        content: "meters";
+        font-size: 0.9rem;
+        color: var(--text-muted);
+    }
+
+    .groups-checkbox-container {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+        gap: 1rem;
+        margin-top: 1rem;
+        max-width: 600px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    .group-checkbox-item {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.75rem;
+        background: rgba(26, 26, 46, 0.95);
+        border-radius: 8px;
+        border: 1px solid var(--medium-blue-slate);
+        transition: all 0.3s ease;
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+    }
+
+    .group-checkbox-item:hover {
+        border-color: var(--periwinkle);
+        transform: translateY(-2px);
+    }
+
+    .group-checkbox-item input[type="checkbox"] {
+        width: auto;
+        margin: 0;
+    }
+
+    .group-checkbox-item label {
+        margin: 0;
+        color: var(--text-light);
+        cursor: pointer;
+    }
+
+    .submit-button {
+        width: 150px;
+        padding: 0.75rem;
+        background: linear-gradient(to right, var(--medium-blue-slate) 0%, var(--periwinkle) 100%);
+        color: var(--white);
+        border: none;
+        border-radius: 8px;
+        font-size: 1rem;
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        transform: translateY(0);
+        margin: 2rem auto 0;
+    }
+
+    .submit-button:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+    }
+
+    .submit-button:active {
+        transform: translateY(0);
+    }
+
+    .error {
+        color: #dc3545;
+        font-size: 0.875rem;
+        margin-top: 0.5rem;
+    }
+
+    .alert {
+        padding: 1rem;
+        margin-bottom: 1rem;
+        border-radius: 8px;
+        font-size: 0.9rem;
+    }
+
+    .alert-success {
+        background: rgba(40, 167, 69, 0.1);
+        border: 1px solid #28a745;
+        color: #28a745;
+    }
+
+    .alert-error {
+        background: rgba(220, 53, 69, 0.1);
+        border: 1px solid #dc3545;
+        color: #dc3545;
+    }
+
+    .visually-hidden {
+        position: absolute !important;
+        height: 1px;
+        width: 1px;
+        overflow: hidden;
+        clip: rect(1px, 1px, 1px, 1px);
+        white-space: nowrap;
+    }
+
+    .date-time-container {
+        display: flex;
+        gap: 1rem;
+        max-width: 600px;
+        margin: 1.5rem auto;
+    }
+
+    .date-time-group {
+        flex: 1;
+    }
+
+    .date-time-group .form-group {
+        margin: 0;
+    }
+
+    .date-time-group input {
+        width: 100%;
+    }
+
+    @media (max-width: 768px) {
+        .home-container {
+            padding: 0 1rem;
+            margin: 1rem auto;
+            width: 85%;
+        }
+
+        .groups-checkbox-container {
+            grid-template-columns: 1fr;
+        }
+
+        .form-label {
+            justify-content: center;
+        }
+
+        .radius-control {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 0.5rem;
+        }
+
+        #radiusValue {
+            text-align: center;
+        }
+
+        .date-time-container {
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+    }
+
+    /* Make input icons white */
+    input[type="date"]::-webkit-calendar-picker-indicator,
+    input[type="time"]::-webkit-calendar-picker-indicator {
+        filter: invert(1);
+        opacity: 0.8;
+    }
+
+    input[type="date"]::-webkit-inner-spin-button,
+    input[type="time"]::-webkit-inner-spin-button {
+        filter: invert(1);
+        opacity: 0.8;
+    }
+
+    /* For Firefox */
+    input[type="date"]::-moz-calendar-picker-indicator,
+    input[type="time"]::-moz-calendar-picker-indicator {
+        filter: invert(1);
+        opacity: 0.8;
+    }
+</style>
 {% endblock %}

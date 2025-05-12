@@ -1,5 +1,9 @@
 from django.contrib import admin
-from .models import User, Role, Organization, Event, Group, EventGroups, UserGroups, UserOrganization
+from .models import (
+    User, Role, Organization, Event, Group, EventGroups, UserGroups, UserOrganization,
+    EventCheckIn, EventAttendance, Announcement, AnnouncementFile, EventAttendees,
+    EventSubstitution, SubstitutionRequest
+)
 
 # Register the custom User model
 @admin.register(User)
@@ -54,3 +58,54 @@ class UserOrganizationAdmin(admin.ModelAdmin):
     list_display = ('user', 'organization')  # Show user-organization associations
     search_fields = ('user__username', 'organization__name')  # Allow searching by user and organization names
     list_filter = ('organization',)  # Filter by organization
+
+# Register the EventCheckIn model
+@admin.register(EventCheckIn)
+class EventCheckInAdmin(admin.ModelAdmin):
+    list_display = ('user', 'event', 'check_in_time', 'is_within_radius')
+    search_fields = ('user__username', 'event__name')
+    list_filter = ('is_within_radius', 'check_in_time', 'event')
+
+# Register the EventAttendance model
+@admin.register(EventAttendance)
+class EventAttendanceAdmin(admin.ModelAdmin):
+    list_display = ('user', 'event', 'check_in_time', 'is_attending')
+    search_fields = ('user__username', 'event__name')
+    list_filter = ('is_attending', 'check_in_time', 'event')
+
+# Register the Announcement model
+@admin.register(Announcement)
+class AnnouncementAdmin(admin.ModelAdmin):
+    list_display = ('title', 'organization', 'created_by', 'created_at', 'is_active')
+    search_fields = ('title', 'content', 'organization__name')
+    list_filter = ('is_active', 'created_at', 'organization')
+    date_hierarchy = 'created_at'
+
+# Register the AnnouncementFile model
+@admin.register(AnnouncementFile)
+class AnnouncementFileAdmin(admin.ModelAdmin):
+    list_display = ('filename', 'announcement', 'uploaded_at')
+    search_fields = ('filename', 'announcement__title')
+    list_filter = ('uploaded_at', 'announcement')
+
+# Register the EventAttendees model
+@admin.register(EventAttendees)
+class EventAttendeesAdmin(admin.ModelAdmin):
+    list_display = ('user', 'event', 'group', 'date_added')
+    search_fields = ('user__username', 'event__name', 'group__name')
+    list_filter = ('date_added', 'event', 'group')
+
+# Register the EventSubstitution model
+@admin.register(EventSubstitution)
+class EventSubstitutionAdmin(admin.ModelAdmin):
+    list_display = ('event', 'original_user', 'substitute_user', 'date_created')
+    search_fields = ('event__name', 'original_user__username', 'substitute_user__username')
+    list_filter = ('date_created', 'event')
+
+# Register the SubstitutionRequest model
+@admin.register(SubstitutionRequest)
+class SubstitutionRequestAdmin(admin.ModelAdmin):
+    list_display = ('event', 'requesting_user', 'target_user', 'status', 'created_at')
+    search_fields = ('event__name', 'requesting_user__username', 'target_user__username')
+    list_filter = ('status', 'created_at', 'event')
+    date_hierarchy = 'created_at'

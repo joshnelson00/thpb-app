@@ -4,158 +4,1075 @@
 
 {% block content %}
 <div class="content">
-    <h1>Edit Groups for {{ organization.name }}</h1>
-    <h3> Invite Code: {{ organization.invite_code }}</h3>
-    
-    <div class="user-group-container-wrapper">
-        {% for user in users_not_in_groups %}
-        <div class="movable-user" id="user{{ user.id }}">{{ user.username }}</div>
-        {% endfor %}
-    </div>
-    
-    <div class="group-container-wrapper">
-        <!-- Loop through each group associated with the organization -->
-        {% for group in groups %}
-        <div class="group-container" data-group-id="{{ group.id }}" id="group{{ group.id }}">
-            <!-- Make the group name editable -->
-            <h2 contenteditable="true" class="editable-group-name">{{ group.name }}</h2>
-            
-            <div class="group-users">
-                {% for user_group in users_in_groups|get_item:group.id %}
-                    <div class="movable-user" id="user{{ user_group.user.id }}">{{ user_group.user.username }}</div>
-                {% endfor %}
+    <div class="manage-groups-container">
+        <div class="page-header">
+            <h1><i class="fas fa-users-cog"></i> {{ organization.name }}</h1>
+            <p class="organization-description">Drag and drop users to manage group memberships</p>
+            <div class="join-code-section">
+                <p>Organization Join Code: <span class="join-code">{{ organization.invite_code }}</span></p>
+                <button class="copy-code-btn" onclick="copyJoinCode()" title="Copy to clipboard">
+                    <i class="fas fa-copy"></i> Copy Code
+                </button>
             </div>
         </div>
-        {% endfor %}
-    </div>
 
-    <!-- Only show the delete button if the logged-in user is the owner of the organization -->
-    {% if organization.owner == request.user %}
-    <form method="POST" action="{% url 'delete_organization' organization.id %}" onsubmit="return confirm('Are you sure you want to delete this organization?');">
-        {% csrf_token %}
-        <button type="submit" class="btn btn-danger">Delete Organization</button>
-    </form>
-    {% endif %}
+        <!-- User Bank Section -->
+        <div class="user-bank">
+            <div class="section-header">
+                <h3><i class="fas fa-user-friends"></i> Available Users</h3>
+                <span class="user-count">{{ users_not_in_groups|length }} users</span>
+            </div>
+            <div class="movable-groups" id="available-users">
+                {% for user in users_not_in_groups %}
+                <div class="movable-group" id="user{{ user.id }}" draggable="true">
+                    <i class="fas fa-user"></i>
+                    {{ user.f_name }} {{ user.l_name }}
+                </div>
+                {% endfor %}
+                {% if not users_not_in_groups %}
+                <div class="empty-state">
+                    <i class="fas fa-info-circle"></i>
+                    <p>No available users</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="groups-grid">
+            {% for group in groups %}
+            <div class="group-card">
+                <div class="group-header">
+                    <div class="group-title">
+                        <h3 class="group-name" data-group-id="{{ group.id }}">{{ group.name }}</h3>
+                    </div>
+                    <div class="group-info">
+                        <span class="member-count">{{ users_in_groups|get_item:group.id|length }} members</span>
+                        <div class="group-actions">
+                            <button class="edit-name-btn" data-group-id="{{ group.id }}" title="Edit group name">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="group-members">
+                    <div class="section-header">
+                        <h4><i class="fas fa-users"></i> Members</h4>
+                    </div>
+                    <div class="movable-groups group-users" data-group-id="{{ group.id }}">
+                        {% for user_group in users_in_groups|get_item:group.id %}
+                        <div class="movable-group" id="user{{ user_group.user.id }}" draggable="true">
+                            <i class="fas fa-user"></i>
+                            {{ user_group.user.f_name }} {{ user_group.user.l_name }}
+                        </div>
+                        {% endfor %}
+                        {% if not users_in_groups|get_item:group.id %}
+                        <div class="empty-state">
+                            <i class="fas fa-info-circle"></i>
+                            <p>No members in this group</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<div class="manage-groups-container">
+    <div class="dashboard-card">
+        <div class="card-header">
+            <h2><i class="fas fa-trash-alt"></i> Danger Zone</h2>
+        </div>
+        <div class="card-content">
+            <div class="delete-section">
+                <p>Once you delete an organization, there is no going back. Please be certain.</p>
+                <button onclick="confirmDeleteOrg()" class="action-btn delete">
+                    <i class="fas fa-trash-alt"></i>
+                    Delete Organization
+                </button>
+            </div>
+        </div>
+    </div>
 </div>
 
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script>
-    $(document).ready(function () {
-    $(".movable-user").attr("draggable", true);
+$(document).ready(function() {
+    // Get CSRF token from cookie
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
 
-    $(".movable-user").on("dragstart", function (event) {
+    const csrftoken = getCookie('csrftoken');
+
+    // Function to update all counts on the page
+    function updateAllCounts() {
+        // Update available users count
+        const availableUsers = $('#available-users .movable-group').length;
+        $('.user-count').text(`${availableUsers} users`);
+
+        // Update all group counts
+        $('.group-users').each(function() {
+            const groupId = $(this).data('group-id');
+            const memberCount = $(this).find('.movable-group').length;
+            $(`.group-card:has(.group-users[data-group-id="${groupId}"]) .member-count`).text(`${memberCount} members`);
+        });
+    }
+
+    // Edit group name functionality
+    $('.edit-name-btn').on('click', function() {
+        const groupId = $(this).data('group-id');
+        const groupNameElement = $(`.group-name[data-group-id="${groupId}"]`);
+        const currentName = groupNameElement.text();
+        
+        const newName = prompt('Enter new group name:', currentName);
+        if (newName && newName !== currentName) {
+            $.ajax({
+                url: '/update-group-name/',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    groupId: groupId,
+                    groupName: newName
+                }),
+                headers: {
+                    'X-CSRFToken': csrftoken
+                },
+                success: function(data) {
+                    if (data.success) {
+                        groupNameElement.text(newName);
+                    } else {
+                        alert('Error updating group name: ' + data.error);
+                    }
+                },
+                error: function(error) {
+                    console.error('Error:', error);
+                    alert('Error updating group name');
+                }
+            });
+        }
+    });
+
+    // Variables for touch handling
+    let draggedUser = null;
+    let touchStartY = 0;
+    let touchStartX = 0;
+    let offsetX = 0;
+    let offsetY = 0;
+    let ghostElement = null;
+
+    // Make all users draggable
+    $(".movable-group").attr("draggable", true);
+
+    // Handle drag start
+    $(".movable-group").on("dragstart", function(event) {
         event.originalEvent.dataTransfer.setData("user_id", $(this).attr("id").replace("user", ""));
+        $(this).addClass("dragging");
     });
 
-    // Add user to group (via drop on a group container)
-    $(".group-container").on("dragover", function (event) {
+    // Handle drag end
+    $(".movable-group").on("dragend", function(event) {
+        $(this).removeClass("dragging");
+    });
+
+    // Handle drag over for all containers
+    $(".movable-groups").on("dragover", function(event) {
         event.preventDefault();
+        const dragging = $(".dragging");
+        if (dragging.length) {
+            const afterElement = getDragAfterElement(this, event.clientY);
+            if (afterElement) {
+                $(this).find(".movable-group").not(".dragging").each(function() {
+                    if ($(this).offset().top > dragging.offset().top) {
+                        $(this).before(dragging);
+                        return false;
+                    }
+                });
+            } else {
+                $(this).append(dragging);
+            }
+        }
     });
 
-    $(".group-container").on("drop", function (event) {
+    // Handle drop on available users
+    $("#available-users").on("drop", function(event) {
         event.preventDefault();
         let user_id = event.originalEvent.dataTransfer.getData("user_id");
-        let group_id = $(this).attr("data-group-id");
-
-        console.log("Sending data:", {
-            user_id: user_id,
-            group_id: group_id,
-            action: "add"
-        });
-
+        let $userElement = $("#user" + user_id);
+        
         $.ajax({
-            url: "{% url 'update_user_group' %}",
-            method: "POST",
-            contentType: "application/json",
+            url: '/update-user-group/',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({
+                user_id: user_id,
+                action: 'remove'
+            }),
+            headers: {
+                'X-CSRFToken': csrftoken
+            },
+            success: function(response) {
+                if (response.success) {
+                    $userElement.appendTo("#available-users");
+                    updateAllCounts();
+                } else {
+                    console.error("Error:", response.error);
+                    alert("Error removing user from group: " + response.error);
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error("AJAX Error:", status, error);
+                alert("Error removing user from group. Please try again.");
+            }
+        });
+    });
+
+    // Handle drop on group members
+    $(".group-users").on("drop", function(event) {
+        event.preventDefault();
+        let user_id = event.originalEvent.dataTransfer.getData("user_id");
+        let group_id = $(this).data("group-id");
+        let $userElement = $("#user" + user_id);
+        
+        $.ajax({
+            url: '/update-user-group/',
+            method: 'POST',
+            contentType: 'application/json',
             data: JSON.stringify({
                 user_id: user_id,
                 group_id: group_id,
-                action: "add"
+                action: 'add'
             }),
             headers: {
-                "X-CSRFToken": "{{ csrf_token }}"
+                'X-CSRFToken': csrftoken
             },
-            success: function (response) {
-                console.log("Success response:", response);
+            success: function(response) {
                 if (response.success) {
-                    $("#user" + user_id).appendTo("#group" + group_id + " .group-users");
+                    $userElement.appendTo($(".group-users[data-group-id='" + group_id + "']"));
+                    updateAllCounts();
                 } else {
                     console.error("Error:", response.error);
+                    alert("Error adding user to group: " + response.error);
                 }
             },
-            error: function (xhr, status, error) {
+            error: function(xhr, status, error) {
                 console.error("AJAX Error:", status, error);
-                console.error("Response Text:", xhr.responseText);
+                alert("Error adding user to group. Please try again.");
             }
         });
     });
 
-    // Remove user from group (via drop back into the user list)
-    $(".user-group-container-wrapper").on("dragover", function (event) {
+    // Helper function to determine drop position
+    function getDragAfterElement(container, y) {
+        const draggableElements = [...$(container).find(".movable-group:not(.dragging)")];
+        
+        return draggableElements.reduce((closest, child) => {
+            const box = child.getBoundingClientRect();
+            const offset = y - box.top - box.height / 2;
+            
+            if (offset < 0 && offset > closest.offset) {
+                return { offset: offset, element: child };
+            } else {
+                return closest;
+            }
+        }, { offset: Number.NEGATIVE_INFINITY }).element;
+    }
+
+    // Touch event handlers for mobile devices
+    $(".movable-group").on("touchstart", function(event) {
+        draggedUser = $(this);
+        const touch = event.touches[0];
+        const rect = this.getBoundingClientRect();
+        
+        offsetX = touch.clientX - rect.left;
+        offsetY = touch.clientY - rect.top;
+        
+        // Create ghost element
+        ghostElement = draggedUser.clone();
+        ghostElement.addClass('ghost-element');
+        ghostElement.css({
+            position: 'fixed',
+            top: touch.clientY - offsetY + 'px',
+            left: touch.clientX - offsetX + 'px',
+            width: draggedUser.width() + 'px',
+            zIndex: 1000,
+            transform: 'scale(1.05)',
+            opacity: 0.8
+        });
+        
+        $('body').append(ghostElement);
+        draggedUser.addClass('dragging');
         event.preventDefault();
     });
 
-    $(".user-group-container-wrapper").on("drop", function (event) {
-        event.preventDefault();
-        let user_id = event.originalEvent.dataTransfer.getData("user_id");
-
-        // Use $.ajax() for consistency
-        $.ajax({
-            url: "{% url 'update_user_group' %}",
-            method: "POST",
-            contentType: "application/json",
-            data: JSON.stringify({
-                user_id: user_id,
-                action: "remove"
-            }),
-            headers: {
-                "X-CSRFToken": "{{ csrf_token }}"
-            },
-            success: function (response) {
-                if (response.success) {
-                    $("#user" + user_id).appendTo(".user-group-container-wrapper");
-                } else {
-                    console.error("Error:", response.error);
+    // Handle touch move
+    $(document).on("touchmove", function(event) {
+        if (draggedUser && ghostElement) {
+            event.preventDefault();
+            const touch = event.touches[0];
+            
+            requestAnimationFrame(() => {
+                ghostElement.css({
+                    top: touch.clientY - offsetY + 'px',
+                    left: touch.clientX - offsetX + 'px'
+                });
+            });
+            
+            const targetElement = document.elementFromPoint(touch.clientX, touch.clientY);
+            
+            if (targetElement) {
+                const targetContainer = $(targetElement).closest('.movable-groups');
+                if (targetContainer.length) {
+                    $('.movable-groups').removeClass('drag-over');
+                    targetContainer.addClass('drag-over');
                 }
-            },
-            error: function (xhr, status, error) {
-                console.error("AJAX Error:", status, error);
             }
-        });
+        }
     });
 
-    // Handle double-click to remove user from group (inside group)
-    $(".group-users").on("dblclick", ".movable-user", function () {
-        let user_id = $(this).attr("id").replace("user", "");
-        let group_id = $(this).closest(".group-container").attr("data-group-id");
-        let $userElement = $(this);
-
-        // Use $.ajax() for consistency
-        $.ajax({
-            url: "{% url 'update_user_group' %}",
-            method: "POST",
-            contentType: "application/json",
-            data: JSON.stringify({
-                user_id: user_id,
-                group_id: group_id,
-                action: "remove"
-            }),
-            headers: {
-                "X-CSRFToken": "{{ csrf_token }}"
-            },
-            success: function (response) {
-                if (response.success) {
-                    $userElement.remove();  // Remove the user from the UI
+    // Handle touch end
+    $(document).on("touchend", function(event) {
+        if (draggedUser && ghostElement) {
+            const touch = event.changedTouches[0];
+            const targetElement = document.elementFromPoint(touch.clientX, touch.clientY);
+            
+            if (targetElement) {
+                const targetContainer = $(targetElement).closest('.movable-groups');
+                if (targetContainer.length) {
+                    const userId = draggedUser.attr("id").replace("user", "");
+                    const isAvailableUsers = targetContainer.attr("id") === "available-users";
+                    const groupId = isAvailableUsers ? null : targetContainer.data("group-id");
+                    
+                    // Store the original container for reference
+                    const originalContainer = draggedUser.parent();
+                    
+                    $.ajax({
+                        url: '/update-user-group/',
+                        method: 'POST',
+                        contentType: 'application/json',
+                        data: JSON.stringify({
+                            user_id: userId,
+                            group_id: groupId,
+                            action: isAvailableUsers ? 'remove' : 'add'
+                        }),
+                        headers: {
+                            'X-CSRFToken': csrftoken
+                        },
+                        success: function(response) {
+                            if (response.success) {
+                                // Move the user element to the new container
+                                draggedUser.appendTo(targetContainer);
+                                
+                                // Update counts for both the original and target containers
+                                updateAllCounts();
+                                
+                                // Force a reflow to ensure proper rendering
+                                document.body.offsetHeight;
+                                
+                                // Add a visual feedback animation
+                                draggedUser.addClass('drop-success');
+                                setTimeout(() => {
+                                    draggedUser.removeClass('drop-success');
+                                }, 500);
+                            } else {
+                                console.error("Error:", response.error);
+                                alert("Error updating user group: " + response.error);
+                            }
+                        },
+                        error: function(xhr, status, error) {
+                            console.error("AJAX Error:", status, error);
+                            alert("Error updating user group. Please try again.");
+                        },
+                        complete: function() {
+                            // Clean up regardless of success or failure
+                            requestAnimationFrame(() => {
+                                ghostElement.remove();
+                                ghostElement = null;
+                                $('.movable-groups').removeClass('drag-over');
+                                draggedUser.removeClass('dragging');
+                                draggedUser = null;
+                                
+                                // Force final update
+                                updateAllCounts();
+                            });
+                        }
+                    });
                 } else {
-                    console.error("Error:", response.error);
+                    // If dropped outside a valid container, clean up
+                    requestAnimationFrame(() => {
+                        ghostElement.remove();
+                        ghostElement = null;
+                        $('.movable-groups').removeClass('drag-over');
+                        draggedUser.removeClass('dragging');
+                        draggedUser = null;
+                    });
                 }
-            },
-            error: function (xhr, status, error) {
-                console.error("AJAX Error:", status, error);
+            } else {
+                // If no target element found, clean up
+                requestAnimationFrame(() => {
+                    ghostElement.remove();
+                    ghostElement = null;
+                    $('.movable-groups').removeClass('drag-over');
+                    draggedUser.removeClass('dragging');
+                    draggedUser = null;
+                });
             }
-        });
+        }
     });
+
+    // Initialize counts on page load
+    updateAllCounts();
+
+    // Add copy join code functionality
+    window.copyJoinCode = function() {
+        const joinCode = document.querySelector('.join-code').textContent;
+        navigator.clipboard.writeText(joinCode).then(() => {
+            const btn = document.querySelector('.copy-code-btn');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-check"></i> Copied!';
+            setTimeout(() => {
+                btn.innerHTML = originalText;
+            }, 2000);
+        });
+    };
+
+    // Add delete organization functionality
+    window.confirmDeleteOrg = function() {
+        if (confirm('Are you sure you want to delete this organization? This action cannot be undone.')) {
+            window.location.href = "{% url 'delete_organization' organization.id %}";
+        }
+    };
 });
 </script>
+
+<style>
+    .content {
+        position: relative;
+        z-index: 1;
+        background: transparent;
+    }
+
+    .manage-groups-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 1.5rem;
+        position: relative;
+        z-index: 1;
+        background: transparent;
+    }
+
+    .page-header {
+        text-align: center;
+        margin-bottom: 2rem;
+        padding-bottom: 1.5rem;
+        border-bottom: 1px solid var(--medium-blue-slate);
+        position: relative;
+        z-index: 1;
+        background: transparent;
+    }
+
+    .page-header h1 {
+        color: var(--text-light);
+        font-size: 2rem;
+        margin-bottom: 0.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.75rem;
+    }
+
+    .page-header h1 i {
+        color: var(--periwinkle);
+    }
+
+    .organization-description {
+        color: var(--text-muted);
+        font-size: 1.1rem;
+    }
+
+    .section-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.75rem;
+    }
+
+    .section-header h3, .section-header h4 {
+        color: var(--text-light);
+        font-size: 1.1rem;
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .section-header h3 i, .section-header h4 i {
+        color: var(--periwinkle);
+    }
+
+    .user-count, .member-count {
+        background-color: var(--darker-bg);
+        color: var(--text-muted);
+        padding: 0.25rem 0.75rem;
+        border-radius: 15px;
+        font-size: 0.85rem;
+        border: 1px solid var(--medium-blue-slate);
+    }
+
+    /* User Bank Styles */
+    .user-bank {
+        background: rgba(36, 36, 68, 0.85);
+        border-radius: 12px;
+        padding: 1.25rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        border: 1px solid var(--medium-blue-slate);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        position: relative;
+        z-index: 1;
+    }
+
+    .movable-groups {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        min-height: 60px;
+        max-height: 300px;
+        padding: 0.75rem;
+        background-color: var(--darker-bg);
+        border-radius: 8px;
+        border: 1px dashed var(--medium-blue-slate);
+        transition: all 0.3s ease;
+        align-items: flex-start;
+        overflow-y: auto;
+        overflow-x: hidden;
+    }
+
+    .movable-groups:hover {
+        border-color: var(--periwinkle);
+        background-color: var(--darker-bg);
+    }
+
+    .groups-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 1.25rem;
+        max-width: 1200px;
+        margin: 0 auto;
+        position: relative;
+        z-index: 1;
+    }
+
+    .group-card {
+        background: rgba(26, 26, 46, 0.85);
+        border-radius: 12px;
+        padding: 1.25rem;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        border: 1px solid var(--group-color, var(--medium-blue-slate));
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        position: relative;
+        z-index: 1;
+    }
+
+    .group-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
+        background: var(--dark-bg);
+    }
+
+    .group-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+        padding-bottom: 0.75rem;
+        border-bottom: 1px solid var(--medium-blue-slate);
+        gap: 1rem;
+    }
+
+    .group-title {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .group-name {
+        color: var(--text-light);
+        font-size: 1.2rem;
+        margin: 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .group-info {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        flex-shrink: 0;
+    }
+
+    .member-count {
+        background-color: var(--darker-bg);
+        color: var(--text-muted);
+        padding: 0.15rem 0.5rem;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        border: 1px solid var(--medium-blue-slate);
+        white-space: nowrap;
+    }
+
+    .edit-name-btn {
+        background: var(--darker-bg);
+        border: 1px solid var(--medium-blue-slate);
+        color: var(--periwinkle);
+        cursor: pointer;
+        padding: 0.3rem;
+        border-radius: 6px;
+        transition: all 0.3s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 24px;
+        height: 24px;
+    }
+
+    .edit-name-btn:hover {
+        background: var(--periwinkle);
+        color: var(--white);
+        transform: translateY(-2px);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    }
+
+    .edit-name-btn i {
+        font-size: 0.8rem;
+    }
+
+    .group-actions {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .group-members {
+        margin-top: 1rem;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .movable-group {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.4rem 0.75rem;
+        background: var(--darker-bg);
+        border-radius: 6px;
+        cursor: move;
+        transition: all 0.3s ease;
+        color: var(--white);
+        margin: 0.1rem;
+        font-size: 0.9rem;
+        white-space: nowrap;
+        max-width: 180px;
+        min-width: 100px;
+        height: 32px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        border: 1px solid var(--group-color, rgba(255, 255, 255, 0.1));
+        justify-content: flex-start;
+        box-sizing: border-box;
+    }
+
+    .movable-group:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        background: var(--dark-bg);
+        border-radius: 6px;
+    }
+
+    .movable-group:hover::before {
+        display: none;
+    }
+
+    .movable-group i {
+        font-size: 0.85rem;
+        opacity: 0.9;
+        flex-shrink: 0;
+    }
+
+    .dragging {
+        opacity: 0.5;
+        background: var(--darker-bg);
+        transform: scale(1.05);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    .dragging::before {
+        display: none;
+    }
+
+    .empty-state {
+        display: none;
+    }
+
+    .join-code-section {
+        background: rgba(36, 36, 68, 0.85);
+        border: 1px solid var(--medium-blue-slate);
+        border-radius: 8px;
+        padding: 1rem;
+        margin-top: 1rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 1rem;
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        position: relative;
+        z-index: 1;
+    }
+
+    .join-code-section p {
+        margin: 0;
+        color: var(--text-light);
+        font-size: 1.1rem;
+    }
+
+    .join-code {
+        font-family: monospace;
+        font-size: 1.2rem;
+        color: var(--periwinkle);
+        background-color: var(--darker-bg);
+        padding: 0.3rem 0.6rem;
+        border-radius: 4px;
+        border: 1px solid var(--medium-blue-slate);
+    }
+
+    .copy-code-btn {
+        background: linear-gradient(to right, var(--medium-blue-slate) 0%, var(--periwinkle) 100%);
+        color: var(--white);
+        border: none;
+        padding: 0.5rem 1rem;
+        border-radius: 6px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        transition: all 0.3s ease;
+    }
+
+    .copy-code-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    }
+
+    .copy-code-btn i {
+        font-size: 0.9rem;
+    }
+
+    .delete-org-section {
+        text-align: center;
+        margin-top: 2rem;
+        padding: 1rem;
+    }
+
+    .delete-org-btn {
+        background: linear-gradient(to right, #dc3545 0%, #c82333 100%);
+        color: var(--white);
+        border: none;
+        padding: 0.75rem 1.5rem;
+        border-radius: 8px;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        transition: all 0.3s ease;
+        font-size: 1.1rem;
+    }
+
+    .delete-org-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        background: linear-gradient(to right, #c82333 0%, #bd2130 100%);
+    }
+
+    .delete-org-btn i {
+        font-size: 1rem;
+    }
+
+    @media (max-width: 768px) {
+        .manage-groups-container {
+            padding: 1rem;
+        }
+
+        .page-header h1 {
+            font-size: 1.6rem;
+        }
+
+        .organization-description {
+            font-size: 1rem;
+        }
+
+        .join-code-section {
+            flex-direction: column;
+            gap: 1rem;
+            padding: 1.25rem;
+            text-align: center;
+        }
+
+        .join-code-section p {
+            font-size: 1rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .join-code {
+            font-size: 1.1rem;
+            padding: 0.5rem 1rem;
+            width: 100%;
+            max-width: 200px;
+            text-align: center;
+            display: inline-block;
+        }
+
+        .copy-code-btn {
+            width: 100%;
+            max-width: 200px;
+            justify-content: center;
+            padding: 0.75rem 1rem;
+        }
+
+        .groups-grid {
+            grid-template-columns: 1fr;
+            gap: 1rem;
+        }
+
+        .group-card {
+            padding: 1rem;
+        }
+
+        .movable-group {
+            padding: 0.5rem 0.75rem;
+            margin: 0.25rem 0;
+            font-size: 0.9rem;
+            touch-action: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .movable-groups {
+            min-height: 80px;
+            max-height: 200px;
+            overflow-y: auto;
+            padding: 0.5rem;
+            margin: 0;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .delete-org-section {
+            margin-top: 1.5rem;
+            padding: 0.75rem;
+        }
+
+        .delete-org-btn {
+            width: 100%;
+            justify-content: center;
+        }
+    }
+
+    @media (max-width: 480px) {
+        .manage-groups-container {
+            padding: 0.75rem;
+        }
+
+        .page-header h1 {
+            font-size: 1.4rem;
+        }
+
+        .organization-description {
+            font-size: 0.9rem;
+        }
+
+        .user-bank {
+            padding: 1rem;
+        }
+
+        .movable-groups {
+            padding: 0.5rem;
+        }
+
+        .movable-group {
+            padding: 0.3rem 0.5rem;
+            font-size: 0.8rem;
+            min-width: 90px;
+            height: 26px;
+        }
+
+        .group-name {
+            font-size: 1.1rem;
+        }
+
+        .section-header h3, .section-header h4 {
+            font-size: 1rem;
+        }
+    }
+
+    .delete-section {
+        text-align: center;
+        padding: 1rem;
+        background: rgba(26, 26, 46, 0.85);
+        border-radius: 12px;
+        border: 1px solid var(--medium-blue-slate);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        position: relative;
+        z-index: 1;
+    }
+
+    .delete-section p {
+        color: var(--text-muted);
+        margin-bottom: 2rem;
+    }
+
+    .action-btn.delete {
+        background: #dc3545;
+        color: var(--white);
+        padding: 0.75rem 1.5rem;
+        border-radius: 25px;
+        border: none;
+        cursor: pointer;
+        font-size: 1rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.75rem;
+        transition: all 0.3s ease;
+    }
+
+    .action-btn.delete:hover {
+        background: #c82333;
+        transform: translateY(-2px);
+    }
+
+    .dashboard-card {
+        background: rgba(26, 26, 46, 0.85);
+        border-radius: 12px;
+        padding: 1.25rem;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        border: 1px solid var(--medium-blue-slate);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        position: relative;
+        z-index: 1;
+    }
+
+    .card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.25rem;
+        padding-bottom: 0.75rem;
+        border-bottom: 1px solid var(--medium-blue-slate);
+        position: relative;
+        z-index: 1;
+    }
+
+    .card-content {
+        position: relative;
+        z-index: 1;
+    }
+
+    /* Add new styles for touch interactions */
+    .ghost-element {
+        background: rgba(72, 72, 102, 0.95);
+        border: 2px solid var(--periwinkle);
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        pointer-events: none;
+        opacity: 0.8;
+        transform: scale(1.05);
+        pointer-events: none;
+        transform: translateZ(0);
+        will-change: transform;
+    }
+
+    .movable-groups.drag-over {
+        background: rgba(72, 72, 102, 0.95);
+        border: 2px dashed var(--periwinkle);
+        transform: scale(1.02);
+        transition: all 0.2s ease;
+    }
+
+    .movable-group {
+        touch-action: none;
+        user-select: none;
+        -webkit-user-select: none;
+        transition: all 0.2s ease;
+    }
+
+    .movable-group.dragging {
+        opacity: 0.5;
+        transform: scale(0.95);
+    }
+
+    /* Add animation for successful drop */
+    .movable-group.drop-success {
+        animation: dropSuccess 0.5s ease-out;
+    }
+
+    @keyframes dropSuccess {
+        0% {
+            transform: scale(1.05);
+            background-color: var(--periwinkle);
+        }
+        50% {
+            transform: scale(1.02);
+            background-color: var(--medium-blue-slate);
+        }
+        100% {
+            transform: scale(1);
+            background-color: var(--darker-bg);
+        }
+    }
+
+    /* Ensure smooth transitions */
+    .movable-groups {
+        transition: all 0.2s ease;
+    }
+
+    .color-update-success {
+        animation: colorUpdateSuccess 0.5s ease-out;
+    }
+
+    @keyframes colorUpdateSuccess {
+        0% {
+            transform: scale(1.02);
+        }
+        50% {
+            transform: scale(1.01);
+        }
+        100% {
+            transform: scale(1);
+        }
+    }
+</style>
 
 {% endblock %}

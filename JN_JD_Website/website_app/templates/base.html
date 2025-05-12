@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}JN JD Website{% endblock %}</title>
+    {% load static %}
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <script src="{% static 'location_tracking.js' %}" defer></script>
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+    <div id="app-container" style="display: none;">
+        {% block content %}{% endblock %}
+    </div>
+    
+    <!-- Location Check Script -->
+    <script>
+        function checkLocationAndShowContent() {
+            if (!navigator.geolocation) {
+                window.location.href = "{% url 'home' %}";
+                return;
+            }
+
+            navigator.geolocation.getCurrentPosition(
+                function(position) {
+                    // Location services are enabled, show content
+                    document.getElementById('app-container').style.display = 'block';
+                    localStorage.setItem('locationEnabled', 'true');
+                },
+                function(error) {
+                    // Location services are disabled or permission denied
+                    localStorage.setItem('locationEnabled', 'false');
+                    window.location.href = "{% url 'home' %}";
+                }
+            );
+        }
+
+        // Check location services on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            const locationEnabled = localStorage.getItem('locationEnabled');
+            if (locationEnabled === 'false' && window.location.pathname !== '/') {
+                window.location.href = "{% url 'home' %}";
+            } else {
+                checkLocationAndShowContent();
+            }
+        });
+
+        // Check location services periodically
+        setInterval(checkLocationAndShowContent, 30000); // Check every 30 seconds
+    </script>
+
+    {% block extra_js %}{% endblock %}
+</body>
+</html> 

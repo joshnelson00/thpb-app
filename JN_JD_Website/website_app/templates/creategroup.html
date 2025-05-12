@@ -2,14 +2,227 @@
 {% load static %}
 
 {% block content %}
-<div class="content">
-    <h1>Create Group</h1>
-    <form method="post" class="form">
-        {% csrf_token %}
-        {{ form.name }}
-        {{ form.organization }}
-        <button type="submit">Submit</button>
-    </form>
-    
+<div class="home-container">
+    <div class="create-group-container">
+        <div class="welcome-section">
+            <h1><i class="fas fa-users"></i> Create New Group</h1>
+            <p class="welcome-message">Create a new group within your organization to better manage members and events.</p>
+        </div>
+
+        <form method="post" class="form create-group-form">
+            {% csrf_token %}
+            <div class="form-group">
+                <label for="{{ form.name.id_for_label }}">
+                    <i class="fas fa-tag"></i> Group Name
+                </label>
+                {{ form.name }}
+                {% if form.name.help_text %}
+                    <small class="form-help-text">{{ form.name.help_text }}</small>
+                {% endif %}
+                {% if form.name.errors %}
+                    <div class="form-error">{{ form.name.errors }}</div>
+                {% endif %}
+            </div>
+
+            <div class="form-group">
+                <label for="{{ form.organization.id_for_label }}">
+                    <i class="fas fa-building"></i> Organization
+                </label>
+                {{ form.organization }}
+                {% if form.organization.help_text %}
+                    <small class="form-help-text">{{ form.organization.help_text }}</small>
+                {% endif %}
+                {% if form.organization.errors %}
+                    <div class="form-error">{{ form.organization.errors }}</div>
+                {% endif %}
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="submit-button">
+                    Create Group
+                </button>
+            </div>
+        </form>
+    </div>
 </div>
+
+<style>
+    .home-container {
+        max-width: 2000px;
+        margin: 2rem auto;
+        padding: 0 2rem;
+        width: 95%;
+    }
+
+    .create-group-container {
+        max-width: 800px;
+        margin: 0 auto;
+    }
+
+    .welcome-section {
+        text-align: center;
+        margin-bottom: 3rem;
+        padding-bottom: 1.5rem;
+        border-bottom: 1px solid var(--medium-blue-slate);
+    }
+
+    .welcome-section h1 {
+        color: var(--text-light);
+        font-size: 2.5rem;
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 1rem;
+    }
+
+    .welcome-section h1 i {
+        color: var(--periwinkle);
+    }
+
+    .welcome-message {
+        color: var(--text-muted);
+        font-size: 1.2rem;
+    }
+
+    .create-group-form {
+        background: linear-gradient(to bottom, rgba(36, 36, 68, 0.95) 0%, rgba(26, 26, 46, 0.95) 100%);
+        padding: 2.5rem;
+        border-radius: 15px;
+        border: 1px solid var(--medium-blue-slate);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+    }
+
+    .form-group {
+        margin-bottom: 1.75rem;
+    }
+
+    .form-group label {
+        display: block;
+        color: var(--text-light);
+        font-size: 1.1rem;
+        margin-bottom: 0.75rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .form-group label i {
+        color: var(--periwinkle);
+    }
+
+    .form-group input,
+    .form-group select {
+        width: 100%;
+        padding: 0.875rem 1rem;
+        background-color: var(--darker-bg);
+        border: 1px solid var(--medium-blue-slate);
+        border-radius: 8px;
+        color: var(--text-light);
+        font-size: 1rem;
+        transition: all 0.3s ease;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus {
+        outline: none;
+        border-color: var(--periwinkle);
+        box-shadow: 0 0 0 2px var(--medium-blue-slate);
+    }
+
+    .form-help-text {
+        display: block;
+        color: var(--text-muted);
+        font-size: 0.9rem;
+        margin-top: 0.5rem;
+    }
+
+    .form-error {
+        color: #ff6b6b;
+        font-size: 0.9rem;
+        margin-top: 0.5rem;
+    }
+
+    .form-actions {
+        display: flex;
+        justify-content: center;
+        margin-top: 2rem;
+    }
+
+    .create-group-form .submit-button {
+        width: 150px;
+        padding: 0.75rem;
+        background: linear-gradient(to right, var(--medium-blue-slate) 0%, var(--periwinkle) 100%);
+        color: var(--white);
+        border: none;
+        border-radius: 8px;
+        font-size: 1rem;
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        position: relative;
+        transform: translateY(0);
+    }
+
+    .create-group-form .submit-button::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        border-radius: 8px;
+        padding: 2px;
+        background: linear-gradient(to right, var(--medium-blue-slate) 0%, var(--periwinkle) 100%);
+        -webkit-mask: 
+            linear-gradient(#fff 0 0) content-box, 
+            linear-gradient(#fff 0 0);
+        -webkit-mask-composite: xor;
+        mask-composite: exclude;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
+
+    .create-group-form .submit-button:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+    }
+
+    .create-group-form .submit-button:hover::before {
+        opacity: 1;
+    }
+
+    .create-group-form .submit-button:active {
+        transform: translateY(0);
+    }
+
+    @media (max-width: 768px) {
+        .home-container {
+            padding: 0 1rem;
+        }
+
+        .welcome-section h1 {
+            font-size: 1.8rem;
+        }
+
+        .welcome-message {
+            font-size: 1rem;
+        }
+
+        .create-group-form {
+            padding: 1.5rem;
+        }
+
+        .form-actions {
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .submit-button {
+            width: 150px;
+        }
+    }
+</style>
 {% endblock %}

@@ -1,0 +1,1244 @@
+{% extends 'index.html' %}
+{% load static %}
+
+{% block title %}Request Substitution{% endblock %}
+
+{% block content %}
+<div class="home-container">
+    <div class="welcome-section">
+        <h1><i class="fas fa-calendar-alt"></i> {{ event.name }}</h1>
+        <p class="welcome-message">{{ event.description }}</p>
+    </div>
+
+    <!-- Add notification badge for pending requests -->
+    {% if pending_requests_count > 0 %}
+    <div class="notification-badge">
+        <i class="fas fa-bell"></i>
+        <span>You have {{ pending_requests_count }} pending substitution request{{ pending_requests_count|pluralize }}</span>
+    </div>
+    {% endif %}
+
+    <div class="dashboard-grid">
+        <!-- Event Details Card -->
+        <div class="dashboard-card event-details-card">
+            <div class="card-header">
+                <h2><i class="fas fa-info-circle"></i> Event Details</h2>
+            </div>
+            <div class="card-content">
+                <div class="event-info">
+                    <div class="info-item">
+                        <i class="fas fa-calendar"></i>
+                        <div class="info-content">
+                            <span class="label">Date & Time</span>
+                            <span class="value">{{ event.date|date:"F j, Y" }} at {{ event.time|time:"g:i A" }}</span>
+                        </div>
+                    </div>
+                    <div class="info-item">
+                        <i class="fas fa-map-marker-alt"></i>
+                        <div class="info-content">
+                            <span class="label">Location</span>
+                            <span class="value">{{ event.location }}</span>
+                        </div>
+                    </div>
+                    <div class="info-item">
+                        <i class="fas fa-clock"></i>
+                        <div class="info-content">
+                            <span class="label">Time Until Event</span>
+                            <span class="value">{{ event.time_display }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Attending Groups Card -->
+        <div class="dashboard-card">
+            <div class="card-header">
+                <h2><i class="fas fa-users"></i> Attending Groups</h2>
+            </div>
+            <div class="card-content">
+                <div class="attending-groups">
+                    {% for group in event.attending_groups %}
+                    <div class="group-item" style="--group-color: {{ group.color }}">
+                        <div class="group-info">
+                            <span class="group-name">{{ group.name }}</span>
+                            <span class="member-count">{{ group.member_count }} members</span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Substitution Requests Card -->
+        <div class="dashboard-card">
+            <div class="card-header">
+                <h2><i class="fas fa-user-exchange"></i> Substitution Requests</h2>
+            </div>
+            <div class="card-content">
+                <div class="substitution-requests-container">
+                    <div class="substitution-requests-list" id="substitutionRequestsList">
+                        {% for request in substitution_requests %}
+                        <div class="substitution-request-item">
+                            <div class="substitution-request-details">
+                                <div class="user-exchange">
+                                    <div class="user-info">
+                                        <span class="label">Requesting User:</span>
+                                        <span class="user-name">{{ request.requesting_user.f_name }} {{ request.requesting_user.l_name }}</span>
+                                    </div>
+                                    <i class="fas fa-arrow-right"></i>
+                                    <div class="user-info">
+                                        <span class="label">Target User:</span>
+                                        <span class="user-name">{{ request.target_user.f_name }} {{ request.target_user.l_name }}</span>
+                                    </div>
+                                </div>
+                                <span class="substitution-request-status status-{{ request.status }}">
+                                    {{ request.status|title }}
+                                </span>
+                            </div>
+                            {% if request.status == 'pending' and request.target_user == user %}
+                            <div class="substitution-request-actions">
+                                <button class="accept-request" data-request-id="{{ request.id }}">
+                                    <i class="fas fa-check"></i> Accept
+                                </button>
+                                <button class="reject-request" data-request-id="{{ request.id }}">
+                                    <i class="fas fa-times"></i> Reject
+                                </button>
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% empty %}
+                        <p class="no-requests">No substitution requests for this event.</p>
+                        {% endfor %}
+                    </div>
+                    
+                    {% if user_can_attend %}
+                    <button class="request-substitution-btn" id="requestSubstitutionBtn">
+                        <i class="fas fa-plus"></i> Request Substitution
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Substitutions Card -->
+        <div class="dashboard-card">
+            <div class="card-header">
+                <h2><i class="fas fa-exchange-alt"></i> Substitutions</h2>
+            </div>
+            <div class="substitutions-container">
+                {% for substitution in substitutions %}
+                <div class="substitution-item">
+                    <div class="substitution-details">
+                        <div class="user-exchange">
+                            <span class="original-user">{{ substitution.original_user.f_name }} {{ substitution.original_user.l_name }}</span>
+                            <i class="fas fa-arrow-right"></i>
+                            <span class="substitute-user">{{ substitution.substitute_user.f_name }} {{ substitution.substitute_user.l_name }}</span>
+                        </div>
+                    </div>
+                    <div class="substitution-meta">
+                        {% if user.is_staff %}
+                        <button class="remove-substitution" data-substitution-id="{{ substitution.id }}">
+                            <i class="fas fa-times"></i>
+                        </button>
+                        {% endif %}
+                    </div>
+                </div>
+                {% empty %}
+                <p class="no-substitutions">No substitutions for this event.</p>
+                {% endfor %}
+                
+                {% if user.is_staff %}
+                <button class="add-substitution-btn" id="addSubstitutionBtn">
+                    <i class="fas fa-plus"></i> Add Substitution
+                </button>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Move modals inside content block -->
+<div id="substitutionModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2><i class="fas fa-exchange-alt"></i> Add Substitution</h2>
+            <button class="close-modal">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form id="substitutionForm">
+                {% csrf_token %}
+                <div class="form-group">
+                    <label for="originalUser">Original User</label>
+                    <select id="originalUser" name="original_user" required>
+                        <option value="">Select original user</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="substituteUser">Substitute User</label>
+                    <select id="substituteUser" name="substitute_user" required>
+                        <option value="">Select substitute user</option>
+                    </select>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="submit-btn">Add Substitution</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Request Substitution Modal -->
+<div id="requestSubstitutionModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2><i class="fas fa-exchange-alt"></i> Request Substitution</h2>
+            <button class="close-modal">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form id="substitutionRequestForm">
+                {% csrf_token %}
+                <input type="hidden" name="event_id" value="{{ event.id }}">
+                <div class="form-group">
+                    <label for="targetUser">Select User to Substitute</label>
+                    <select id="targetUser" name="target_user" required>
+                        <option value="">Select a user</option>
+                        {% for user in organization_users %}
+                            {% if user.id != request.user.id and user.id != event.organization.owner.id %}
+                            <option value="{{ user.id }}">{{ user.f_name }} {{ user.l_name }}</option>
+                            {% endif %}
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="submit-btn">Request Substitution</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeRequestModal()">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+.home-container {
+    max-width: 1200px;
+    margin: 2rem auto;
+    padding: 0 1rem;
+}
+
+.welcome-section {
+    text-align: center;
+    margin-bottom: 2rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid var(--medium-blue-slate);
+}
+
+.welcome-section h1 {
+    color: var(--text-light);
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+}
+
+.welcome-section h1 i {
+    color: var(--periwinkle);
+}
+
+.welcome-message {
+    color: var(--text-muted);
+    font-size: 1.1rem;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(700px, 1fr));
+    gap: 1.5rem;
+    margin-top: 2rem;
+}
+
+.dashboard-card {
+    background: var(--dark-bg);
+    border-radius: 12px;
+    border: 1px solid var(--medium-blue-slate);
+    overflow: hidden;
+}
+
+.card-header {
+    padding: 1.25rem;
+    background: var(--darker-bg);
+    border-bottom: 1px solid var(--medium-blue-slate);
+}
+
+.card-header h2 {
+    color: var(--text-light);
+    font-size: 1.25rem;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.card-header h2 i {
+    color: var(--periwinkle);
+}
+
+.card-content {
+    padding: 1.25rem;
+}
+
+/* Event Details Styles */
+.event-info {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.info-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+}
+
+.info-item i {
+    color: var(--periwinkle);
+    font-size: 1.25rem;
+    margin-top: 0.25rem;
+}
+
+.info-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.info-content .label {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
+.info-content .value {
+    color: var(--text-light);
+    font-size: 1.1rem;
+}
+
+/* Attending Groups Styles */
+.attending-groups {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.group-item {
+    background: var(--darker-bg);
+    border-radius: 8px;
+    padding: 1rem;
+    border: 1px solid var(--group-color, var(--medium-blue-slate));
+}
+
+.group-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.group-name {
+    color: var(--text-light);
+    font-weight: 500;
+}
+
+.member-count {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
+/* Substitutions Styles */
+.substitutions-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    align-items: center;
+    width: 100%;
+    padding: 1.5rem;
+}
+
+.substitution-item {
+    border-radius: 8px;
+    padding: 1.5rem;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    max-width: 800px;
+}
+
+.substitution-details {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    width: 100%;
+}
+
+.user-exchange {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1.5rem;
+    padding: 1.5rem;
+    background: var(--darker-bg);
+    border-radius: 8px;
+    border: 1px solid var(--medium-blue-slate);
+    width: 100%;
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.user-exchange i {
+    color: var(--periwinkle);
+}
+
+.substitution-meta {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+}
+
+.no-substitutions {
+    text-align: center;
+    color: var(--text-muted);
+    padding: 2rem;
+    font-size: 1.1rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    width: 100%;
+}
+
+/* Substitution Requests Styles */
+.substitution-requests-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    align-items: center;
+    width: 100%;
+}
+
+.substitution-requests-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    width: 100%;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.substitution-request-item {
+    border-radius: 8px;
+    margin-bottom: 0.5rem;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.substitution-request-details {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    align-items: center;
+    text-align: center;
+    width: 100%;
+}
+
+.user-exchange {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    padding: 1rem;
+    background: var(--darker-bg);
+    border-radius: 8px;
+    border: 1px solid var(--medium-blue-slate);
+    width: 100%;
+    max-width: 500px;
+    margin: 0 auto;
+}
+
+.user-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    align-items: center;
+    text-align: center;
+    min-width: 150px;
+}
+
+.user-info .label {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
+.user-info .username {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    font-style: italic;
+}
+
+.user-info .user-name {
+    font-size: 1.1rem;
+    font-weight: 500;
+    color: var(--text-light);
+}
+
+.user-exchange i {
+    color: var(--periwinkle);
+    font-size: 1.2rem;
+}
+
+.substitution-request-status {
+    display: inline-block;
+    padding: 0.4rem 1.25rem;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    margin-top: 0.75rem;
+}
+
+.status-pending {
+    background: #ffd700;
+    color: #000;
+}
+
+.status-accepted {
+    background: #28a745;
+    color: #fff;
+}
+
+.status-rejected {
+    background: #dc3545;
+    color: #fff;
+}
+
+.substitution-request-actions {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 0.75rem;
+    justify-content: center;
+    width: 100%;
+    max-width: 500px;
+}
+
+.accept-request, .reject-request {
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.accept-request {
+    background: #28a745;
+    color: white;
+}
+
+.reject-request {
+    background: #dc3545;
+    color: white;
+}
+
+.accept-request:hover, .reject-request:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.no-requests {
+    text-align: center;
+    color: var(--text-muted);
+    padding: 2rem;
+    font-size: 1.1rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    width: 100%;
+}
+
+.no-requests i {
+    font-size: 2rem;
+    color: var(--periwinkle);
+}
+
+/* Button Styles */
+.add-substitution-btn, .request-substitution-btn {
+    background: var(--medium-blue-slate);
+    color: var(--white);
+    border: none;
+    border-radius: 8px;
+    padding: 0.75rem 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    margin: 0 auto;
+    font-size: 1rem;
+}
+
+.add-substitution-btn:hover, .request-substitution-btn:hover {
+    background: var(--periwinkle);
+    transform: translateY(-2px);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .dashboard-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .substitution-item {
+        padding: 1rem;
+    }
+
+    .user-exchange {
+        padding: 1rem;
+    }
+
+    .substitution-details {
+        flex-direction: column;
+    }
+
+    .substitution-request-item {
+        padding: 1rem;
+    }
+
+    .user-exchange {
+        padding: 1rem;
+    }
+
+    .substitution-request-actions {
+        flex-direction: column;
+        width: 100%;
+        max-width: 300px;
+    }
+
+    .accept-request, .reject-request {
+        width: 100%;
+    }
+}
+
+/* Update modal styles */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+}
+
+.modal-content {
+    background: linear-gradient(135deg, var(--card-bg) 0%, var(--darker-bg) 100%);
+    margin: 5% auto;
+    padding: 0;
+    border: 1px solid var(--medium-blue-slate);
+    width: 90%;
+    max-width: 500px;
+    border-radius: 12px;
+    position: relative;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+}
+
+.modal-header {
+    padding: 1.25rem;
+    background: var(--darker-bg);
+    border-bottom: 1px solid var(--medium-blue-slate);
+    border-radius: 12px 12px 0 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-header h2 {
+    color: var(--text-light);
+    font-size: 1.25rem;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.modal-header h2 i {
+    color: var(--periwinkle);
+}
+
+.close-modal {
+    color: var(--text-muted);
+    font-size: 1.5rem;
+    font-weight: bold;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    transition: color 0.3s ease;
+}
+
+.close-modal:hover {
+    color: var(--text-light);
+}
+
+.modal-body {
+    padding: 1.5rem;
+}
+
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-group label {
+    display: block;
+    color: var(--text-light);
+    margin-bottom: 0.75rem;
+    font-weight: 500;
+    font-size: 1rem;
+}
+
+.form-group select {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--medium-blue-slate);
+    border-radius: 8px;
+    background: var(--darker-bg);
+    color: var(--text-light);
+    font-size: 1rem;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%23666' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.14L2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 1rem center;
+    padding-right: 2.5rem;
+}
+
+.form-group select:focus {
+    outline: none;
+    border-color: var(--periwinkle);
+    box-shadow: 0 0 0 2px rgba(102, 102, 255, 0.2);
+}
+
+.form-group select option {
+    background: var(--darker-bg);
+    color: var(--text-light);
+    padding: 0.5rem;
+}
+
+.form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+    margin-top: 2rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--medium-blue-slate);
+}
+
+.submit-btn, .btn-secondary {
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-width: 120px;
+}
+
+.submit-btn {
+    background: var(--medium-blue-slate);
+    color: var(--white);
+    border: none;
+}
+
+.submit-btn:hover {
+    background: var(--periwinkle);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 102, 255, 0.2);
+}
+
+.btn-secondary {
+    background: var(--darker-bg);
+    color: var(--text-light);
+    border: 1px solid var(--medium-blue-slate);
+}
+
+.btn-secondary:hover {
+    background: var(--medium-blue-slate);
+    color: var(--white);
+    transform: translateY(-2px);
+}
+
+.btn-primary {
+    background: var(--medium-blue-slate);
+    color: var(--white);
+}
+
+.btn-primary:hover {
+    background: var(--periwinkle);
+    transform: translateY(-2px);
+}
+
+/* Add animation for modal */
+@keyframes modalFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.modal-content {
+    animation: modalFadeIn 0.3s ease-out;
+}
+
+/* Add notification badge styles */
+.notification-badge {
+    background-color: #f8d7da;
+    color: #721c24;
+    padding: 10px 15px;
+    border-radius: 5px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    animation: pulse 2s infinite;
+}
+
+.notification-badge i {
+    font-size: 1.2em;
+}
+
+@keyframes pulse {
+    0% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.05);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+</style>
+
+<script>
+// Basic test to verify JavaScript is executing
+console.log('Script loaded');
+
+// Test if we can find the button
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('DOM Content Loaded');
+    const btn = document.getElementById('requestSubstitutionBtn');
+    const modal = document.getElementById('requestSubstitutionModal');
+    const closeBtn = modal.querySelector('.close-modal');
+    
+    console.log('Button found:', btn);
+    console.log('Modal found:', modal);
+    console.log('Close button found:', closeBtn);
+    
+    if (btn) {
+        console.log('Adding click listener to button');
+        btn.onclick = function() {
+            console.log('Button clicked');
+            if (modal) {
+                console.log('Modal found, showing it');
+                modal.style.display = 'block';
+            } else {
+                console.log('Modal not found');
+            }
+        };
+    }
+
+    if (closeBtn) {
+        console.log('Adding close button listener');
+        closeBtn.onclick = function() {
+            console.log('Close button clicked');
+            modal.style.display = 'none';
+        };
+    }
+
+    // Close modal when clicking outside
+    window.onclick = function(event) {
+        if (event.target === modal) {
+            console.log('Clicked outside modal');
+            modal.style.display = 'none';
+        }
+    };
+});
+
+// Substitution Modal Functionality
+const substitutionModal = document.getElementById('substitutionModal');
+const addSubstitutionBtn = document.getElementById('addSubstitutionBtn');
+const closeSubstitutionModal = substitutionModal?.querySelector('.close-modal');
+const groupSelect = document.getElementById('group');
+const originalUserSelect = document.getElementById('originalUser');
+const substituteUserSelect = document.getElementById('substituteUser');
+const substitutionForm = document.getElementById('substitutionForm');
+
+if (addSubstitutionBtn && substitutionModal) {
+    addSubstitutionBtn.addEventListener('click', () => {
+        substitutionModal.style.display = 'block';
+    });
+}
+
+if (closeSubstitutionModal) {
+    closeSubstitutionModal.addEventListener('click', () => {
+        substitutionModal.style.display = 'none';
+    });
+}
+
+if (substitutionModal) {
+    window.addEventListener('click', (e) => {
+        if (e.target === substitutionModal) {
+            substitutionModal.style.display = 'none';
+        }
+    });
+}
+
+// Update users based on selected group
+if (groupSelect) {
+    groupSelect.addEventListener('change', async () => {
+        const groupId = groupSelect.value;
+        if (!groupId) return;
+
+        try {
+            const response = await fetch(`/get_group_members/${groupId}/`);
+            const data = await response.json();
+            
+            if (originalUserSelect && substituteUserSelect) {
+                // Clear existing options
+                originalUserSelect.innerHTML = '<option value="">Select original user</option>';
+                substituteUserSelect.innerHTML = '<option value="">Select substitute user</option>';
+                
+                // Add new options
+                data.members.forEach(member => {
+                    const originalOption = new Option(member.name, member.id);
+                    const substituteOption = new Option(member.name, member.id);
+                    originalUserSelect.add(originalOption);
+                    substituteUserSelect.add(substituteOption);
+                });
+            }
+        } catch (error) {
+            console.error('Error fetching group members:', error);
+        }
+    });
+}
+
+// Handle substitution form submission
+if (substitutionForm) {
+    substitutionForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const formData = new FormData(substitutionForm);
+        formData.append('event_id', '{{ event.id }}');
+        
+        try {
+            const response = await fetch('/add_substitution/', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                }
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                window.location.reload();
+            } else {
+                alert(data.error || 'Error adding substitution');
+            }
+        } catch (error) {
+            console.error('Error adding substitution:', error);
+            alert('Error adding substitution');
+        }
+    });
+}
+
+// Handle substitution removal
+document.querySelectorAll('.remove-substitution').forEach(button => {
+    button.addEventListener('click', async () => {
+        if (!confirm('Are you sure you want to remove this substitution?')) return;
+        
+        const substitutionId = button.dataset.substitutionId;
+        
+        try {
+            const response = await fetch(`/remove_substitution/${substitutionId}/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                }
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                window.location.reload();
+            } else {
+                alert(data.error || 'Error removing substitution');
+            }
+        } catch (error) {
+            console.error('Error removing substitution:', error);
+            alert('Error removing substitution');
+        }
+    });
+});
+
+// Initialize everything when the page loads
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('DOM Content Loaded');
+    
+    // Set up request substitution modal
+    const requestModal = document.getElementById('requestSubstitutionModal');
+    const requestSubstitutionBtn = document.getElementById('requestSubstitutionBtn');
+    const requestModalClose = requestModal.querySelector('.close-modal');
+    const requestSubstitutionForm = document.getElementById('substitutionRequestForm');
+
+    // Initialize request substitution button
+    if (requestSubstitutionBtn) {
+        requestSubstitutionBtn.addEventListener('click', () => {
+            console.log('Request substitution button clicked');
+            requestModal.style.display = 'block';
+        });
+    }
+
+    // Initialize modal close button
+    if (requestModalClose) {
+        requestModalClose.addEventListener('click', () => {
+            requestModal.style.display = 'none';
+        });
+    }
+
+    // Close modal when clicking outside
+    window.addEventListener('click', (e) => {
+        if (e.target === requestModal) {
+            requestModal.style.display = 'none';
+        }
+    });
+
+    // Handle substitution request form submission
+    if (requestSubstitutionForm) {
+        requestSubstitutionForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            console.log('Form submitted');
+            
+            const formData = new FormData(requestSubstitutionForm);
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+            
+            // Get form data
+            const eventId = formData.get('event_id');
+            const targetUserId = formData.get('target_user');
+            
+            console.log('Initial form data:', {
+                event_id: eventId,
+                target_user_id: targetUserId
+            });
+            
+            const requestData = {
+                event_id: eventId,
+                target_user_id: targetUserId
+            };
+            
+            console.log('Sending request with data:', requestData);
+            
+            try {
+                const response = await fetch('/request_substitution/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken
+                    },
+                    body: JSON.stringify(requestData)
+                });
+                
+                console.log('Response status:', response.status);
+                const responseData = await response.json();
+                
+                if (responseData.success) {
+                    console.log('Request successful');
+                    requestModal.style.display = 'none';
+                    window.location.reload();
+                } else {
+                    console.error('Request failed:', responseData.error);
+                    alert(responseData.error || 'Error creating substitution request');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error creating substitution request');
+            }
+        });
+    }
+
+    // Load initial substitution requests
+    loadSubstitutionRequests();
+});
+
+// Load substitution requests
+async function loadSubstitutionRequests() {
+    try {
+        console.log('Loading substitution requests...');
+        const eventId = '{{ event.id }}';
+        console.log('Event ID:', eventId);
+        
+        const response = await fetch(`/get_substitution_requests/?event_id=${eventId}`);
+        const data = await response.json();
+        console.log('Response data:', data);
+        
+        if (data.success) {
+            const requestsList = document.getElementById('substitutionRequestsList');
+            if (!requestsList) {
+                console.error('Could not find substitutionRequestsList element');
+                return;
+            }
+            
+            requestsList.innerHTML = '';
+            
+            if (data.requests.length === 0) {
+                requestsList.innerHTML = '<p class="no-requests">No substitution requests for this event.</p>';
+                return;
+            }
+            
+            data.requests.forEach(request => {
+                console.log('Processing request:', request);
+                console.log('Requesting user:', request.requesting_user);
+                console.log('Target user:', request.target_user);
+                
+                const requestItem = document.createElement('div');
+                requestItem.className = 'substitution-request-item';
+                
+                const details = document.createElement('div');
+                details.className = 'substitution-request-details';
+                details.innerHTML = `
+                    <div class="user-exchange">
+                        <div class="user-info">
+                            <span class="label">Requesting User:</span>
+                            <span class="user-name">${request.requesting_user.name}</span>
+                        </div>
+                        <i class="fas fa-arrow-right"></i>
+                        <div class="user-info">
+                            <span class="label">Target User:</span>
+                            <span class="user-name">${request.target_user.name}</span>
+                        </div>
+                    </div>
+                    <span class="substitution-request-status status-${request.status}">
+                        ${request.status.charAt(0).toUpperCase() + request.status.slice(1)}
+                    </span>
+                `;
+                
+                const actions = document.createElement('div');
+                actions.className = 'substitution-request-actions';
+                
+                // Check if the current user is the target user and the request is pending
+                const currentUserId = parseInt('{{ user.id }}');
+                if (request.status === 'pending' && request.target_user.id === currentUserId) {
+                    actions.innerHTML = `
+                        <button class="accept-request" data-request-id="${request.id}">
+                            <i class="fas fa-check"></i> Accept
+                        </button>
+                        <button class="reject-request" data-request-id="${request.id}">
+                            <i class="fas fa-times"></i> Reject
+                        </button>
+                    `;
+                }
+                
+                requestItem.appendChild(details);
+                requestItem.appendChild(actions);
+                requestsList.appendChild(requestItem);
+            });
+            
+            // Add event listeners for accept/reject buttons
+            document.querySelectorAll('.accept-request').forEach(button => {
+                button.addEventListener('click', () => handleRequestResponse(button.dataset.requestId, 'accept'));
+            });
+            
+            document.querySelectorAll('.reject-request').forEach(button => {
+                button.addEventListener('click', () => handleRequestResponse(button.dataset.requestId, 'reject'));
+            });
+        } else {
+            console.error('Error loading substitution requests:', data.error);
+        }
+    } catch (error) {
+        console.error('Error loading substitution requests:', error);
+    }
+}
+
+// Handle substitution request response
+async function handleRequestResponse(requestId, action) {
+    try {
+        const response = await fetch(`/respond_to_substitution_request/${requestId}/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            body: new URLSearchParams({
+                'action': action
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            window.location.reload();
+        } else {
+            alert(data.error || 'Error responding to substitution request');
+        }
+    } catch (error) {
+        console.error('Error responding to substitution request:', error);
+        alert('Error responding to substitution request');
+    }
+}
+
+// Add this function to handle modal closing
+function closeRequestModal() {
+    const modal = document.getElementById('requestSubstitutionModal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
+
+// Update the modal close button event listener
+document.addEventListener('DOMContentLoaded', () => {
+    const requestModal = document.getElementById('requestSubstitutionModal');
+    const closeButtons = requestModal.querySelectorAll('.close-modal, .btn-secondary');
+    
+    closeButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            closeRequestModal();
+        });
+    });
+
+    // Close modal when clicking outside
+    window.addEventListener('click', (e) => {
+        if (e.target === requestModal) {
+            closeRequestModal();
+        }
+    });
+});
+</script>
+{% endblock %} 

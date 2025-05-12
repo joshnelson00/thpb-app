@@ -1,47 +1,237 @@
 {% extends 'login.html' %}
-{% load static %}
 
 {% block content %}
 <div class="content">
-    <h1>Create Account</h1>
-    <div class="form-border">
-        <form method="post">
-            {% csrf_token %}
-            <div class="form">
-                {% for field in form %}
-                    {% if field.name != "remember_me" %}
-                        <div class="form-group">
-                            {{ field }}
-                            {% if field.errors %}
-                                <div class="error-message">
-                                    {% for error in field.errors %}
-                                        <p>{{ error }}</p>
-                                    {% endfor %}
-                                </div>
-                            {% endif %}
-                        </div>
-                    {% endif %}
-                {% endfor %}
-                
-                <div class="remember-me-group">
-                    <div class="remember-me-box">
-                        {{ form.remember_me }}
+    <div class="auth-container">
+        <div class="auth-header">
+            <h1><i class="fas fa-user-plus"></i> Create Account</h1>
+        </div>
+        <div class="auth-card">
+            <form method="post" class="auth-form">
+                {% csrf_token %}
+                <div class="form-group">
+                    <label for="{{ form.f_name.id_for_label }}">First Name</label>
+                    {{ form.f_name }}
+                    {% if form.f_name.errors %}
+                    <div class="field-error">
+                        {% for error in form.f_name.errors %}
+                            <i class="fas fa-exclamation-circle"></i> {{ error }}
+                        {% endfor %}
                     </div>
-                    <label for="{{ form.remember_me.id_for_label }}">Remember Me</label>
+                    {% endif %}
                 </div>
-    
-                <button type="submit">Sign Up</button>
+                <div class="form-group">
+                    <label for="{{ form.l_name.id_for_label }}">Last Name</label>
+                    {{ form.l_name }}
+                    {% if form.l_name.errors %}
+                    <div class="field-error">
+                        {% for error in form.l_name.errors %}
+                            <i class="fas fa-exclamation-circle"></i> {{ error }}
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="form-group">
+                    <label for="{{ form.username.id_for_label }}">Username</label>
+                    {{ form.username }}
+                    {% if form.username.errors %}
+                    <div class="field-error">
+                        {% for error in form.username.errors %}
+                            <i class="fas fa-exclamation-circle"></i> {{ error }}
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="form-group">
+                    <label for="{{ form.password1.id_for_label }}">Password</label>
+                    {{ form.password1 }}
+                    {% if form.password1.errors %}
+                    <div class="field-error">
+                        {% for error in form.password1.errors %}
+                            <i class="fas fa-exclamation-circle"></i> {{ error }}
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="form-group">
+                    <label for="{{ form.password2.id_for_label }}">Confirm Password</label>
+                    {{ form.password2 }}
+                    {% if form.password2.errors %}
+                    <div class="field-error">
+                        {% for error in form.password2.errors %}
+                            <i class="fas fa-exclamation-circle"></i> {{ error }}
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+                <button type="submit" class="auth-button">
+                    <i class="fas fa-user-plus"></i> Create Account
+                </button>
+            </form>
+            <div class="auth-links">
+                <a href="{% url 'signin' %}" class="auth-link">
+                    <i class="fas fa-sign-in-alt"></i> Already have an account? Sign in
+                </a>
             </div>
-    
-            {% if form.non_field_errors %}
-                <div class="error-message">
-                    {% for error in form.non_field_errors %}
-                        <p>{{ error }}</p>
-                    {% endfor %}
-                </div>
-            {% endif %}
-        </form>
+        </div>
     </div>
-    
 </div>
+
+<style>
+    .content {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 2rem;
+        background: none;
+        box-shadow: none;
+        border: none;
+    }
+
+    .auth-container {
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-start;
+        align-items: center;
+        min-height: calc(100vh - 200px);
+        padding-top: 0rem;
+    }
+
+    .auth-header {
+        text-align: center;
+        margin-bottom: 0.0rem;
+    }
+
+    .auth-header h1 {
+        color: var(--text-light);
+        font-size: 2rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.75rem;
+    }
+
+    .auth-header h1 i {
+        color: var(--periwinkle);
+    }
+
+    .auth-card {
+        background: linear-gradient(to bottom, var(--card-bg) 0%, var(--dark-bg) 100%);
+        padding: 2.5rem;
+        border-radius: 12px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+        width: 100%;
+        max-width: 420px;
+        border: 1px solid var(--medium-blue-slate);
+    }
+
+    .auth-form {
+        margin-bottom: 1.5rem;
+    }
+
+    .form-group {
+        margin-bottom: 1.25rem;
+    }
+
+    .form-group label {
+        display: block;
+        color: var(--text-light);
+        margin-bottom: 0.5rem;
+        font-size: 0.9rem;
+    }
+
+    .form-group input[type="text"],
+    .form-group input[type="password"] {
+        width: 100%;
+        padding: 0.75rem;
+        border: 1px solid var(--medium-blue-slate);
+        border-radius: 8px;
+        background: var(--darker-bg);
+        color: var(--text-light);
+        font-size: 1rem;
+        transition: all 0.3s ease;
+    }
+
+    .form-group input:focus {
+        outline: none;
+        border-color: var(--periwinkle);
+        box-shadow: 0 0 0 2px rgba(147, 112, 219, 0.2);
+    }
+
+    .auth-button {
+        width: 100%;
+        padding: 0.75rem;
+        background: var(--periwinkle);
+        color: var(--rich-black);
+        border: none;
+        border-radius: 8px;
+        font-size: 1rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        margin-top: 1rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+    }
+
+    .auth-button:hover {
+        transform: translateY(-2px);
+        filter: brightness(1.1);
+    }
+
+    .auth-links {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+        text-align: center;
+    }
+
+    .auth-link {
+        color: var(--periwinkle);
+        text-decoration: none;
+        font-size: 0.9rem;
+        transition: all 0.3s ease;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+    }
+
+    .auth-link:hover {
+        color: var(--text-light);
+    }
+
+    .field-error {
+        color: #dc3545;
+        font-size: 0.8rem;
+        margin-top: 0.25rem;
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+    }
+
+    .field-error i {
+        font-size: 0.8rem;
+    }
+
+    @media (max-width: 768px) {
+        .content {
+            padding: 1rem;
+        }
+
+        .auth-container {
+            padding-top: 2rem;
+        }
+
+        .auth-card {
+            padding: 2rem;
+            max-width: 380px;
+        }
+
+        .auth-header h1 {
+            font-size: 1.75rem;
+        }
+    }
+</style>
 {% endblock %}

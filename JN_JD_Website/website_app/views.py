@@ -1,22 +1,122 @@
 from django.utils.timezone import now
 from django.contrib import messages
 import time, json
+from datetime import datetime, time as datetime_time
 
 from django.http import JsonResponse
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import login as auth_login
 from django.shortcuts import render, redirect, get_object_or_404
-from .forms import SignInForm, CreateAccountForm, CreateOrganizationForm, CreateGroupForm, CreateEventForm, JoinOrganizationForm
+from .forms import SignInForm, CreateAccountForm, CreateOrganizationForm, CreateGroupForm, CreateEventForm, JoinOrganizationForm, CreateGeofenceForm
 from django.views.decorators.csrf import csrf_exempt
-from .models import Organization, Event, UserGroups, EventGroups, UserOrganization, Group, User
+from .models import Organization, Event, UserGroups, EventGroups, UserOrganization, Group, User, EventCheckIn, EventAttendance, Announcement, AnnouncementFile, EventAttendees, EventSubstitution, SubstitutionRequest
 from django.http import Http404
+from django.conf import settings
+from django.views.decorators.http import require_POST
+from django.utils import timezone
+import math
+from django.db.models import Q
+import pytz
+from django.core.paginator import Paginator
+from django.core.exceptions import PermissionDenied
 
 
 
 @login_required
 def home(request):
-    # You can populate the context with data specific to the user or the page
-    context = {}
+    # Get organizations owned by the user
+    owned_organizations = Organization.objects.filter(owner=request.user)
+    
+    # Get organizations where user is a member (but not owner)
+    member_organizations = Organization.objects.filter(
+        user_organizations__user=request.user
+    ).exclude(owner=request.user)
+    
+    # Get all organizations user has access to
+    organizations = owned_organizations | member_organizations
+    
+    # Base query for events - same as view_events
+    events_query = Event.objects.filter(
+        Q(attendees__user=request.user) |  # Events where user is an attendee
+        Q(organization__in=organizations)  # Events from organizations user owns or is a member of
+    ).distinct()
+    
+    # Get current time in UTC
+    current_time = timezone.now()
+    
+    # Get all events and filter them in Python to handle timezone conversions properly
+    all_events = events_query.order_by('date', 'time')
+    upcoming_events = []
+    
+    for event in all_events:
+        # Get the event's timezone
+        event_tz = pytz.timezone(event.timezone)
+        
+        # Create a datetime object in the event's timezone
+        event_datetime = timezone.datetime.combine(event.date, event.time)
+        event_datetime = event_tz.localize(event_datetime)
+        
+        # Get current time in the event's timezone
+        current_time_tz = current_time.astimezone(event_tz)
+        
+        # Calculate time difference
+        time_until = event_datetime - current_time_tz
+        minutes_until = int(time_until.total_seconds() / 60)
+        
+        # Only include events that haven't started yet or are within the check-in window
+        if minutes_until > -5:  # Changed from > 0 to > -5 to include events in progress
+            event.minutes_until = minutes_until
+            # Set can_check_in property - allow check-in 30 minutes before and 5 minutes after event
+            event.can_check_in = -5 <= minutes_until <= 30
+            # Set is_concluded property - event is concluded if it's more than 5 minutes past start time
+            event.is_concluded = minutes_until < -5
+            # Check if user has already checked in
+            event.user_check_in = EventCheckIn.objects.filter(
+                user=request.user,
+                event=event,
+                is_within_radius=True
+            ).exists()
+            # Get attending groups for the event
+            event.attending_groups = [{'name': event_group.group.name, 'color': event_group.group.color} for event_group in event.groups.all()]
+            
+            # Calculate time display
+            if minutes_until >= 1440:  # More than 24 hours
+                days = minutes_until // 1440
+                remaining_minutes = minutes_until % 1440
+                hours = remaining_minutes // 60
+                event.time_display = f"{days}d {hours}h"
+            elif minutes_until >= 60:  # More than 1 hour
+                hours = minutes_until // 60
+                minutes = minutes_until % 60
+                event.time_display = f"{hours}h {minutes}m"
+            else:
+                event.time_display = f"{minutes_until}m"
+            
+            # Check if user is attending this event
+            event.user_can_attend = EventAttendees.objects.filter(event=event, user=request.user).exists()
+            
+            upcoming_events.append(event)
+            
+            # Break after getting 3 events
+            if len(upcoming_events) >= 3:
+                break
+
+    # Get user's groups with their roles
+    user_groups = UserGroups.objects.filter(user=request.user).select_related('group', 'group__organization')
+
+    # Get all announcements from organizations the user has access to
+    announcements = Announcement.objects.filter(
+        organization__in=organizations,
+        is_active=True
+    ).select_related('created_by', 'organization').prefetch_related('files').order_by('-created_at')[:5]
+
+    context = {
+        'upcoming_events': upcoming_events,
+        'user_groups': user_groups,
+        'owned_organizations': owned_organizations,
+        'member_organizations': member_organizations,
+        'announcements': announcements,
+    }
     return render(request, 'home.html', context)
 
 @login_required
@@ -29,7 +129,7 @@ def create_account(request):
     if request.method == "POST":
         form = CreateAccountForm(request.POST)
         if form.is_valid():
-            user = form.save(commit=False)  # Create user but don’t save yet
+            user = form.save(commit=False)  # Create user but don't save yet
             user.save()  # Now save the user after modifying if needed
 
             auth_login(request, user)  # Log in the newly created user
@@ -60,7 +160,20 @@ def sign_in(request):
                     request.session.set_expiry(0)
                 return redirect('home')
             else:
-                form.add_error(None, "Invalid credentials.")
+                # Check if username exists
+                username = form.cleaned_data.get('username')
+                if User.objects.filter(username=username).exists():
+                    form.add_error(None, "Incorrect password. Please try again.")
+                else:
+                    form.add_error(None, "No account found with this username. Please check your username or create a new account.")
+        else:
+            # Handle specific form errors
+            if 'username' in form.errors:
+                form.add_error(None, "Please enter a valid username.")
+            elif 'password' in form.errors:
+                form.add_error(None, "Please enter your password.")
+            else:
+                form.add_error(None, "Please check your username and password and try again.")
     else:
         form = SignInForm()
 
@@ -125,7 +238,6 @@ def edit_groups(request, org_id):
 
 @login_required
 def update_user_group(request):
-
     try:
         # Try to handle both JSON and form data
         if request.content_type == 'application/json':
@@ -141,22 +253,37 @@ def update_user_group(request):
         action = data.get("action")
         group_id = data.get("group_id")
 
-
-        # Rest of your existing validation logic...
-        if not user_id or not user_id.isdigit():
+        # Validate user_id
+        if not user_id:
+            return JsonResponse({"success": False, "error": "User ID is required"}, status=400)
+        
+        try:
+            user_id = int(user_id)
+        except (ValueError, TypeError):
             return JsonResponse({"success": False, "error": "Invalid user ID"}, status=400)
 
-        user = get_object_or_404(User, id=int(user_id))
+        user = get_object_or_404(User, id=user_id)
 
         if action == "add":
-            if not group_id or not group_id.isdigit():
+            if not group_id:
+                return JsonResponse({"success": False, "error": "Group ID is required"}, status=400)
+            
+            try:
+                group_id = int(group_id)
+            except (ValueError, TypeError):
                 return JsonResponse({"success": False, "error": "Invalid group ID"}, status=400)
             
-            group = get_object_or_404(Group, id=int(group_id))
+            group = get_object_or_404(Group, id=group_id)
             role = data.get("role", None)
 
-            # Add user to group
-            UserGroups.objects.get_or_create(user=user, group=group, role=role)
+            # First remove user from any existing groups in the same organization
+            UserGroups.objects.filter(
+                user=user,
+                group__organization=group.organization
+            ).delete()
+
+            # Then add user to the new group
+            UserGroups.objects.create(user=user, group=group, role=role)
             
             return JsonResponse({
                 "success": True, 
@@ -165,10 +292,15 @@ def update_user_group(request):
 
         elif action == "remove":
             if group_id:
+                try:
+                    group_id = int(group_id)
+                except (ValueError, TypeError):
+                    return JsonResponse({"success": False, "error": "Invalid group ID"}, status=400)
+                
                 # Remove from specific group
                 deleted_count, _ = UserGroups.objects.filter(
                     user=user, 
-                    group__id=int(group_id)
+                    group__id=group_id
                 ).delete()
             else:
                 # Remove from all groups
@@ -267,22 +399,74 @@ def edit_event(request, event_id):
     event = get_object_or_404(Event, id=event_id, owner=request.user)
     
     if request.method == 'POST':
-        form = CreateEventForm(request.POST, user=request.user, instance=event)
+        # Create a mutable copy of the POST data
+        data = request.POST.copy()
+        
+        # Ensure required fields are present
+        if not all(key in data for key in ['name', 'date', 'time', 'location', 'description', 'organization', 'latitude', 'longitude', 'radius']):
+            return JsonResponse({'success': False, 'error': 'Missing required fields'})
+        
+        # Create form with the data
+        form = CreateEventForm(data, user=request.user, instance=event)
+        
         if form.is_valid():
             event = form.save(commit=False)
+            # Preserve the original organization and owner
+            event.organization = Organization.objects.get(id=data['organization'])
+            event.owner = request.user
             event.save()
-
-            # Clear existing group associations and add the new ones
-            event.groups.clear()
-            event.groups.add(*form.cleaned_data['groups'])
             
-            return redirect('viewevents')  # Redirect to the view events page
+            # Handle groups and update attendees
+            new_groups = set(form.cleaned_data.get('groups', []))
+            
+            # Get all users from the new groups
+            new_group_users = User.objects.filter(
+                membership_groups__group__in=new_groups
+            ).distinct()
+            
+            # Add all users from new groups as attendees
+            for user in new_group_users:
+                EventAttendees.objects.get_or_create(
+                    event=event,
+                    user=user
+                )
+            
+            return JsonResponse({'success': True, 'message': 'Event updated successfully'})
+        else:
+            # Return form errors
+            return JsonResponse({
+                'success': False, 
+                'error': 'Invalid form data',
+                'form_errors': form.errors
+            })
     else:
         form = CreateEventForm(user=request.user, instance=event)
 
+    # Get all users from the event's organization
+    org_users = User.objects.filter(
+        user_organizations__organization=event.organization
+    ).distinct()
+    
+    # Split users into attending and available
+    attending_users = []
+    available_users = []
+    for user in org_users:
+        is_attending = EventAttendees.objects.filter(event=event, user=user).exists()
+        user_info = {
+            'id': user.id,
+            'name': f"{user.f_name} {user.l_name}",
+            'is_attending': is_attending
+        }
+        if is_attending:
+            attending_users.append(user_info)
+        else:
+            available_users.append(user_info)
+
     context = {
         'form': form,
-        'event': event
+        'event': event,
+        'attending_users': attending_users,
+        'available_users': available_users,
     }
 
     return render(request, 'editevent.html', context)
@@ -290,47 +474,158 @@ def edit_event(request, event_id):
 
 @login_required
 def view_events(request):
-    # Get organizations the user owns
-    owned_organizations = Organization.objects.filter(owner=request.user)
-
-    if owned_organizations.exists():
-        # If user owns organizations, show all events from those organizations
-        events = Event.objects.filter(organization__in=owned_organizations, date__gte=now()).distinct()
-    else:
-        # Otherwise, get events based on group membership
-        user_groups = UserGroups.objects.filter(user=request.user).values_list('group', flat=True)
-        events = Event.objects.filter(
-            id__in=EventGroups.objects.filter(group__in=user_groups).values_list('event', flat=True),
-            date__gte=now()
-        ).distinct()
-
-    # Optional filtering by organization or group
-    organization_id = request.GET.get('organization_id')
-    group_id = request.GET.get('group_id')
-
-    if organization_id:
-        events = events.filter(organization_id=organization_id)
-    if group_id:
-        events = events.filter(groups__id=group_id).distinct()
-
-    # Attach attending groups to each event
-    for event in events:
-        event.attending_groups = Group.objects.filter(events__event=event)
+    # Get organizations the user owns or is a member of
+    organizations = Organization.objects.filter(
+        Q(owner=request.user) | Q(user_organizations__user=request.user)
+    ).distinct()
+    
+    # Get user's groups
+    user_groups = UserGroups.objects.filter(user=request.user).values_list('group', flat=True)
+    
+    # Base query for events
+    events_query = Event.objects.filter(
+        Q(attendees__user=request.user) |  # Events where user is an attendee
+        Q(organization__in=organizations)  # Events from organizations user owns or is a member of
+    ).distinct()
+    
+    # Apply organization filter if selected
+    selected_organization_id = request.GET.get('organization_id')
+    if selected_organization_id:
+        events_query = events_query.filter(organization_id=selected_organization_id)
+    
+    # Get current time in UTC
+    current_time = timezone.now()
+    
+    # Get all events and filter them in Python to handle timezone conversions properly
+    all_events = events_query.order_by('date', 'time')
+    upcoming_events = []
+    
+    for event in all_events:
+        # Get the event's timezone
+        event_tz = pytz.timezone(event.timezone)
+        
+        # Create a datetime object in the event's timezone
+        event_datetime = timezone.datetime.combine(event.date, event.time)
+        event_datetime = event_tz.localize(event_datetime)
+        
+        # Get current time in the event's timezone
+        current_time_tz = current_time.astimezone(event_tz)
+        
+        # Calculate time difference
+        time_until = event_datetime - current_time_tz
+        minutes_until = int(time_until.total_seconds() / 60)
+        
+        # Only include events that haven't started yet or are within the check-in window
+        if minutes_until > -5:  # Changed from > 0 to > -5 to include events in progress
+            event.minutes_until = minutes_until
+            # Set can_check_in property - allow check-in 30 minutes before and 5 minutes after event
+            event.can_check_in = -5 <= minutes_until <= 30
+            # Set is_concluded property - event is concluded if it's more than 5 minutes past start time
+            event.is_concluded = minutes_until < -5
+            # Check if user has already checked in
+            event.user_check_in = EventCheckIn.objects.filter(
+                user=request.user,
+                event=event,
+                is_within_radius=True
+            ).exists()
+            # Get attending groups for the event
+            event.attending_groups = [{'name': event_group.group.name, 'color': event_group.group.color} for event_group in event.groups.all()]
+            
+            # Calculate time display
+            if minutes_until >= 1440:  # More than 24 hours
+                days = minutes_until // 1440
+                remaining_minutes = minutes_until % 1440
+                hours = remaining_minutes // 60
+                event.time_display = f"{days}d {hours}h"
+            elif minutes_until >= 60:  # More than 1 hour
+                hours = minutes_until // 60
+                minutes = minutes_until % 60
+                event.time_display = f"{hours}h {minutes}m"
+            else:
+                event.time_display = f"{minutes_until}m"
+            
+            # Check if user is attending this event
+            event.user_can_attend = EventAttendees.objects.filter(event=event, user=request.user).exists()
+            
+            upcoming_events.append(event)
 
     context = {
-        'events': events,
-        'organizations': Organization.objects.filter(groups__in=user_groups).distinct() if not owned_organizations.exists() else owned_organizations,
-        'selected_organization_id': organization_id,
-        'selected_group_id': group_id,
+        'events': upcoming_events,
+        'organizations': organizations,
+        'selected_organization_id': selected_organization_id,
     }
-
     return render(request, 'viewevents.html', context)
 
+@login_required
+def view_past_events(request):
+    # Get organizations the user owns or is a member of
+    organizations = Organization.objects.filter(
+        Q(owner=request.user) | Q(user_organizations__user=request.user)
+    ).distinct()
+    
+    # Get user's groups
+    user_groups = UserGroups.objects.filter(user=request.user).values_list('group', flat=True)
+    
+    # Base query for events
+    events_query = Event.objects.filter(
+        Q(attendees__user=request.user) |  # Events where user is an attendee
+        Q(organization__in=organizations)  # Events from organizations user owns or is a member of
+    ).distinct()
+    
+    # Apply organization filter if selected
+    selected_organization_id = request.GET.get('organization_id')
+    if selected_organization_id:
+        events_query = events_query.filter(organization_id=selected_organization_id)
+    
+    # Get current time in UTC
+    current_time = timezone.now()
+    
+    # Get all events and filter them in Python to handle timezone conversions properly
+    all_events = events_query.order_by('-date', '-time')
+    past_events = []
+    
+    for event in all_events:
+        # Get the event's timezone
+        event_tz = pytz.timezone(event.timezone)
+        
+        # Create a datetime object in the event's timezone
+        event_datetime = timezone.datetime.combine(event.date, event.time)
+        event_datetime = event_tz.localize(event_datetime)
+        
+        # Get current time in the event's timezone
+        current_time_tz = current_time.astimezone(event_tz)
+        
+        # Calculate time difference
+        time_until = event_datetime - current_time_tz
+        minutes_until = int(time_until.total_seconds() / 60)
+        
+        # Only include events that have already started
+        if minutes_until <= 0:
+            event.minutes_until = minutes_until
+            # Get attending groups for the event
+            event.attending_groups = [{'name': event_group.group.name, 'color': event_group.group.color} for event_group in event.groups.all()]
+            # Check if user has already checked in
+            event.user_check_in = EventCheckIn.objects.filter(
+                user=request.user,
+                event=event,
+                is_within_radius=True
+            ).exists()
+            # Check if user is attending this event
+            event.user_can_attend = EventAttendees.objects.filter(event=event, user=request.user).exists()
+            past_events.append(event)
 
+    context = {
+        'events': past_events,
+        'organizations': organizations,
+        'selected_organization_id': selected_organization_id,
+    }
+    return render(request, 'pastevents.html', context)
 
 
 @login_required
 def view_organizations(request):
+    view_type = request.GET.get('view', 'all')
+    
     # Fetch organizations where the current user is the owner
     owned_organizations = Organization.objects.filter(owner=request.user)
     
@@ -340,11 +635,16 @@ def view_organizations(request):
     # For owned organizations, fetch groups where the user is the owner
     owned_groups = Group.objects.filter(owner=request.user)
     
-    # Pass the owned groups to the context as well
+    # Fetch user's groups in organizations
+    user_groups = UserGroups.objects.filter(user=request.user).select_related('group', 'group__organization')
+    
+    # Pass the context data
     context = {
         'owned_organizations': owned_organizations,
         'member_organizations': member_organizations,
-        'owned_groups': owned_groups
+        'owned_groups': owned_groups,
+        'user_groups': user_groups,
+        'view_type': view_type
     }
 
     return render(request, 'vieworgs.html', context)
@@ -363,9 +663,15 @@ def create_org(request):
             # Automatically add the user as a member of the organization
             UserOrganization.objects.create(user=request.user, organization=organization)
             
+            # Check if this is the user's first organization
+            owned_orgs_count = Organization.objects.filter(owner=request.user).count()
+            
             # Optionally, add a success message
             messages.success(request, f"You've successfully created {organization.name} and joined it!")
 
+            # If this is the user's first organization, redirect to create group page
+            if owned_orgs_count == 1:
+                return redirect('creategroup')
             return redirect('home')
     else:
         form = CreateOrganizationForm()
@@ -398,37 +704,65 @@ def create_group(request):
 
 @login_required
 def create_event(request):
-    if request.method == "POST":
-        form = CreateEventForm(data=request.POST, user=request.user)
+    if request.method == 'POST':
+        form = CreateEventForm(request.POST, user=request.user)
         if form.is_valid():
             event = form.save(commit=False)
             event.owner = request.user
+            # Store the creator's timezone
+            event.timezone = request.POST.get('timezone', 'America/New_York')
             event.save()
-
-            # Create EventGroups associations for the selected groups
-            selected_groups = form.cleaned_data.get('groups')
-            if selected_groups:
-                for group in selected_groups:
-                    EventGroups.objects.create(group=group, event=event)
-
-            # Redirect to home page after successful form submission
-            return redirect('home')
-        else:
-            print(form.errors)  # Print form errors for debugging
+            
+            # Save the groups to EventGroups
+            groups = form.cleaned_data.get('groups', [])
+            for group in groups:
+                EventGroups.objects.create(group=group, event=event)
+            
+            # Always add the organization owner as an attendee
+            organization = form.cleaned_data.get('organization')
+            if organization and organization.owner:
+                EventAttendees.objects.get_or_create(
+                    event=event,
+                    user=organization.owner
+                )
+            
+            # Handle groups and add their users as attendees
+            for group in groups:
+                # Add all users from the group as attendees
+                group_users = UserGroups.objects.filter(group=group)
+                for user_group in group_users:
+                    EventAttendees.objects.get_or_create(
+                        event=event,
+                        user=user_group.user,
+                        group=group  # Store the group reference
+                    )
+            
+            messages.success(request, 'Event created successfully!')
+            return redirect('viewevents')
     else:
-        # Initialize the form and call update_groups to update available groups
         form = CreateEventForm(user=request.user)
-
-        # If the organization is selected through GET (via AJAX or other means)
-        organization_id = request.GET.get('organization_id')
-        if organization_id:
-            form.update_groups(organization_id)
-
+    
+    # Get user's timezone
+    user_timezone = request.POST.get('timezone', 'America/New_York')
+    
     context = {
         'form': form,
+        'user_timezone': user_timezone,
     }
-    
     return render(request, 'createevent.html', context)
+
+@login_required
+def get_groups_by_org(request, org_id):
+    try:
+        # Fetch groups for the specific organization
+        groups = Group.objects.filter(organization_id=org_id).values('id', 'name')
+        
+        return JsonResponse({
+            'groups': list(groups)
+        })
+    except Organization.DoesNotExist:
+        return JsonResponse({'groups': []}, status=404)
+    
 @login_required
 def join_org(request):
     if request.method == "POST":
@@ -450,3 +784,1208 @@ def join_org(request):
         form = JoinOrganizationForm()
 
     return render(request, "joinorg.html", {"form": form})
+
+@login_required
+def update_event_group(request):
+    try:
+        data = json.loads(request.body)
+        group_id = data.get('group_id')
+        event_id = data.get('event_id')
+        action = data.get('action')
+
+        if not all([group_id, event_id, action]):
+            return JsonResponse({"success": False, "error": "Missing required parameters"}, status=400)
+
+        # Get the event and verify ownership
+        event = get_object_or_404(Event, id=event_id, owner=request.user)
+        group = get_object_or_404(Group, id=group_id)
+
+        if action == "add":
+            # Add group to event
+            EventGroups.objects.get_or_create(group=group, event=event)
+            # Add all users from the group as attendees
+            group_users = UserGroups.objects.filter(group=group)
+            for user_group in group_users:
+                EventAttendees.objects.get_or_create(
+                    event=event,
+                    user=user_group.user,
+                    group=group
+                )
+            return JsonResponse({
+                "success": True,
+                "message": f"Group {group.name} added to event {event.name}"
+            })
+        elif action == "remove":
+            # Remove group from event
+            EventGroups.objects.filter(group=group, event=event).delete()
+            # Remove attendees from the removed group
+            EventAttendees.objects.filter(event=event, group=group).delete()
+            return JsonResponse({
+                "success": True,
+                "message": f"Group {group.name} removed from event {event.name}"
+            })
+        else:
+            return JsonResponse({"success": False, "error": "Invalid action"}, status=400)
+
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+        return JsonResponse({"success": False, "error": str(e)}, status=500)
+
+@login_required
+def delete_event(request, event_id):
+    if request.method == 'POST':
+        try:
+            event = Event.objects.get(id=event_id)
+            # Check if the user is the owner of the event
+            if event.owner != request.user:
+                return JsonResponse({'success': False, 'error': 'You do not have permission to delete this event'})
+            
+            event_name = event.name  # Store the event name before deletion
+            event.delete()
+            return JsonResponse({
+                'success': True,
+                'message': f'Event "{event_name}" has been successfully deleted.'
+            })
+        except Event.DoesNotExist:
+            return JsonResponse({'success': False, 'error': 'Event not found'})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    return JsonResponse({'success': False, 'error': 'Invalid request method'})
+
+@login_required
+@csrf_exempt
+def update_user_location(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            latitude = data.get('latitude')
+            longitude = data.get('longitude')
+            
+            if latitude is not None and longitude is not None:
+                request.user.latitude = latitude
+                request.user.longitude = longitude
+                request.user.save()
+                return JsonResponse({'status': 'success'})
+            else:
+                return JsonResponse({'status': 'error', 'message': 'Missing latitude or longitude'}, status=400)
+        except json.JSONDecodeError:
+            return JsonResponse({'status': 'error', 'message': 'Invalid JSON'}, status=400)
+        except Exception as e:
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+    return JsonResponse({'status': 'error', 'message': 'Invalid request method'}, status=405)
+
+def calculate_distance(lat1, lon1, lat2, lon2):
+    # Haversine formula to calculate distance between two points
+    R = 6371000  # Earth's radius in meters
+    phi1 = math.radians(float(lat1))
+    phi2 = math.radians(float(lat2))
+    delta_phi = math.radians(float(lat2) - float(lat1))
+    delta_lambda = math.radians(float(lon2) - float(lon1))
+
+    a = math.sin(delta_phi/2) * math.sin(delta_phi/2) + \
+        math.cos(phi1) * math.cos(phi2) * \
+        math.sin(delta_lambda/2) * math.sin(delta_lambda/2)
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
+    return R * c
+
+@login_required
+@require_POST
+def check_in_to_event(request, event_id):
+    try:
+        event = Event.objects.get(id=event_id)
+        
+        # Handle both JSON and form data
+        if request.content_type == 'application/json':
+            try:
+                data = json.loads(request.body)
+                latitude = data.get('latitude')
+                longitude = data.get('longitude')
+            except json.JSONDecodeError:
+                return JsonResponse({'error': 'Invalid JSON data'}, status=400)
+        else:
+            latitude = request.POST.get('latitude')
+            longitude = request.POST.get('longitude')
+
+        if not latitude or not longitude:
+            return JsonResponse({'error': 'Location data is required'}, status=400)
+
+        # Get the event's timezone
+        event_tz = pytz.timezone(event.timezone)
+        
+        # Create a datetime object in the event's timezone
+        event_datetime = timezone.datetime.combine(event.date, event.time)
+        event_datetime = event_tz.localize(event_datetime)
+        
+        # Get current time in the event's timezone
+        current_time = timezone.now().astimezone(event_tz)
+        
+        # Calculate time difference
+        time_until = event_datetime - current_time
+        minutes_until = int(time_until.total_seconds() / 60)
+        
+        # Check if within time window (-30 to 30 minutes around event time)
+        is_within_time = -30 <= minutes_until <= 30
+
+        # Calculate distance from event location
+        distance = calculate_distance(
+            event.geofence_latitude,
+            event.geofence_longitude,
+            latitude,
+            longitude
+        )
+
+        # Check if within radius (convert radius to meters if needed)
+        is_within_radius = distance <= event.geofence_radius
+
+        # Only allow check-in if both conditions are met
+        if not is_within_time:
+            return JsonResponse({
+                'error': 'Check-in is only available 30 minutes before and after the event time'
+            }, status=400)
+            
+        if not is_within_radius:
+            return JsonResponse({
+                'error': 'You must be within the event location to check in',
+                'distance': round(distance, 2),
+                'radius': event.geofence_radius
+            }, status=400)
+
+        # Create or update check-in
+        check_in, created = EventCheckIn.objects.update_or_create(
+            user=request.user,
+            event=event,
+            defaults={
+                'latitude': latitude,
+                'longitude': longitude,
+                'is_within_radius': is_within_radius,
+                'check_in_time': timezone.now()
+            }
+        )
+
+        # Also update EventAttendance
+        attendance, _ = EventAttendance.objects.update_or_create(
+            user=request.user,
+            event=event,
+            defaults={
+                'check_in_time': timezone.now() if is_within_radius else None,
+                'is_attending': is_within_radius
+            }
+        )
+
+        return JsonResponse({
+            'success': True,
+            'is_within_radius': is_within_radius,
+            'distance': round(distance, 2),
+            'message': 'Check-in successful'
+        })
+
+    except Event.DoesNotExist:
+        return JsonResponse({'error': 'Event not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+@login_required
+def event_attendance(request, event_id):
+    event = get_object_or_404(Event, id=event_id)
+    
+    # Only event owners can view attendance
+    if event.owner != request.user:
+        messages.error(request, "You don't have permission to view this event's attendance.")
+        return redirect('home')
+    
+    # Get all users who are expected to attend (from EventAttendees)
+    expected_attendees = User.objects.filter(
+        attending_events__event=event
+    ).exclude(id=event.owner.id).distinct()  # Exclude the event owner
+    
+    # Get all check-ins for this event
+    check_ins = EventCheckIn.objects.filter(
+        event=event,
+        is_within_radius=True
+    ).select_related('user').exclude(user=event.owner)  # Exclude the event owner
+    
+    # Create attendance lists
+    attended = [check_in.user for check_in in check_ins]
+    
+    # Get all users who checked in but weren't expected to attend
+    unexpected_attendees = [user for user in attended if user not in expected_attendees]
+    
+    # Get all expected attendees who didn't show up
+    absent = [user for user in expected_attendees if user not in attended]
+    
+    # Calculate attendance rate safely
+    total_expected = len(expected_attendees)
+    total_attended = len(attended)
+    attendance_rate = (total_attended / total_expected * 100) if total_expected > 0 else 0
+    
+    context = {
+        'event': event,
+        'attended': attended,
+        'absent': absent,
+        'unexpected_attendees': unexpected_attendees,
+        'total_expected': total_expected,
+        'total_attended': total_attended,
+        'attendance_rate': attendance_rate
+    }
+    
+    return render(request, 'event_attendance.html', context)
+
+@login_required
+def account_details(request):
+    return render(request, 'account_details.html', {
+        'user': request.user,
+    })
+
+@login_required
+def notifications(request):
+    return render(request, 'notifications.html', {
+        'user': request.user,
+    })
+
+@login_required
+def settings(request):
+    return render(request, 'settings.html', {
+        'user': request.user,
+    })
+
+@login_required
+def help_support(request):
+    return render(request, 'help.html', {
+        'user': request.user,
+    })
+
+@login_required
+def get_substitution_requests(request):
+    if request.method == 'GET':
+        event_id = request.GET.get('event_id')
+        
+        try:
+            event = Event.objects.get(id=event_id)
+            
+            # Get requests where user is either requesting or target
+            requests = SubstitutionRequest.objects.filter(
+                event=event
+            ).filter(
+                Q(requesting_user=request.user) | Q(target_user=request.user)
+            ).order_by('-created_at')
+            
+            requests_data = [{
+                'id': req.id,
+                'requesting_user': {
+                    'id': req.requesting_user.id,
+                    'name': f"{req.requesting_user.f_name} {req.requesting_user.l_name}",
+                    'username': req.requesting_user.username
+                },
+                'target_user': {
+                    'id': req.target_user.id,
+                    'name': f"{req.target_user.f_name} {req.target_user.l_name}",
+                    'username': req.target_user.username
+                },
+                'status': req.status,
+                'created_at': req.created_at.strftime('%Y-%m-%d %H:%M:%S')
+            } for req in requests]
+            
+            return JsonResponse({'success': True, 'requests': requests_data})
+        except Event.DoesNotExist:
+            return JsonResponse({'success': False, 'error': 'Event not found'})
+    
+    return JsonResponse({'success': False, 'error': 'Invalid request method'})
+
+@login_required
+def request_substitution(request):
+    if request.method == 'POST':
+        try:
+            print("Received substitution request")
+            print("Request body:", request.body)
+            data = json.loads(request.body)
+            print("Parsed request data:", data)
+            
+            event_id = data.get('event_id')
+            target_user_id = data.get('target_user_id')
+            
+            print(f"Extracted parameters: event_id={event_id}, target_user_id={target_user_id}")
+            
+            if not all([event_id, target_user_id]):
+                print("Missing required parameters")
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Missing required parameters'
+                }, status=400)
+            
+            try:
+                event = Event.objects.get(id=event_id)
+                target_user = User.objects.get(id=target_user_id)
+                print(f"Found event: {event.name}, target user: {target_user.get_full_name()}")
+            except (Event.DoesNotExist, User.DoesNotExist) as e:
+                print(f"Object not found: {str(e)}")
+                return JsonResponse({
+                    'success': False,
+                    'error': f'Object not found: {str(e)}'
+                }, status=404)
+            
+            # Check if user is authorized to request substitution
+            if not event.attendees.filter(user=request.user).exists():
+                print("User not authorized to request substitution")
+                return JsonResponse({
+                    'success': False,
+                    'error': 'You are not authorized to request substitution for this event'
+                }, status=403)
+            
+            # Check if a substitution request already exists
+            existing_request = SubstitutionRequest.objects.filter(
+                event=event,
+                requesting_user=request.user,
+                target_user=target_user
+            ).first()
+            
+            if existing_request:
+                if existing_request.status == 'pending':
+                    print(f"Pending request already exists: {existing_request}")
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'A pending substitution request already exists'
+                    }, status=400)
+                elif existing_request.status == 'accepted':
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'This substitution has already been accepted'
+                    }, status=400)
+                elif existing_request.status == 'rejected':
+                    # If the previous request was rejected, create a new one
+                    existing_request.delete()
+            
+            # Create the substitution request
+            try:
+                substitution_request = SubstitutionRequest.objects.create(
+                    event=event,
+                    requesting_user=request.user,
+                    target_user=target_user
+                )
+                print(f"Created substitution request: {substitution_request}")
+                
+                return JsonResponse({
+                    'success': True,
+                    'message': 'Substitution request created successfully',
+                    'request_id': substitution_request.id
+                })
+            except Exception as e:
+                print(f"Error creating substitution request: {str(e)}")
+                return JsonResponse({
+                    'success': False,
+                    'error': f'Error creating substitution request: {str(e)}'
+                }, status=500)
+                
+        except json.JSONDecodeError as e:
+            print("JSON decode error:", str(e))
+            return JsonResponse({
+                'success': False,
+                'error': 'Invalid JSON data'
+            }, status=400)
+    
+    return JsonResponse({
+        'success': False,
+        'error': 'Invalid request method'
+    }, status=405)
+
+@login_required
+def view_announcements(request):
+    # Get organizations where user is either owner or member
+    owned_organizations = Organization.objects.filter(owner=request.user)
+    member_organizations = Organization.objects.filter(
+        user_organizations__user=request.user
+    ).exclude(owner=request.user)
+
+    # Combine both querysets
+    organizations = list(owned_organizations) + list(member_organizations)
+
+    # Get all announcements from all organizations the user has access to
+    announcements = Announcement.objects.filter(
+        organization__in=organizations,
+        is_active=True
+    ).select_related('created_by', 'organization').prefetch_related('files').order_by('-created_at')
+
+    context = {
+        'organizations': organizations,  # Keep this for the create announcement dropdown
+        'announcements': announcements,
+    }
+    return render(request, 'viewannouncements.html', context)
+
+@login_required
+@require_POST
+def edit_announcement(request, announcement_id):
+    try:
+        # Get the announcement and verify ownership
+        announcement = get_object_or_404(Announcement, id=announcement_id)
+        if announcement.organization.owner != request.user:
+            return JsonResponse({'error': 'You do not have permission to edit this announcement'}, status=403)
+
+        # Get data from request
+        data = request.POST
+        files = request.FILES.getlist('files')
+        files_to_remove = request.POST.getlist('files_to_remove')
+
+        # Update announcement details
+        announcement.title = data.get('title')
+        announcement.content = data.get('content')
+        announcement.save()
+
+        # Remove selected files
+        if files_to_remove:
+            AnnouncementFile.objects.filter(id__in=files_to_remove).delete()
+
+        # Add new files
+        for file in files:
+            AnnouncementFile.objects.create(
+                announcement=announcement,
+                file=file,
+                filename=file.name
+            )
+
+        return JsonResponse({'success': True})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+@login_required
+def get_announcement_files(request, announcement_id):
+    try:
+        # Get the announcement and verify access
+        announcement = get_object_or_404(Announcement, id=announcement_id)
+        if not (announcement.organization.owner == request.user or 
+                UserOrganization.objects.filter(user=request.user, organization=announcement.organization).exists()):
+            return JsonResponse({'error': 'You do not have permission to view these files'}, status=403)
+
+        # Get files
+        files = announcement.files.all()
+        files_data = [{
+            'id': file.id,
+            'filename': file.filename,
+            'url': file.file.url
+        } for file in files]
+
+        return JsonResponse({'files': files_data})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+@login_required
+def get_announcement_details(request, announcement_id):
+    try:
+        announcement = Announcement.objects.get(id=announcement_id)
+        # Check if user has access to this announcement
+        if not (announcement.organization.owner == request.user or request.user in announcement.organization.members.all()):
+            return JsonResponse({'error': 'You do not have permission to access this announcement'}, status=403)
+        
+        return JsonResponse({
+            'title': announcement.title,
+            'content': announcement.content,
+            'organization_id': announcement.organization.id
+        })
+    except Announcement.DoesNotExist:
+        return JsonResponse({'error': 'Announcement not found'}, status=404)
+
+@login_required
+def update_group_color(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            group_id = data.get('groupId')
+            color = data.get('color')
+            
+            if not group_id or not color:
+                return JsonResponse({'success': False, 'error': 'Missing required fields'})
+            
+            group = Group.objects.get(id=group_id)
+            
+            # Verify user has permission to edit this group
+            if group.organization.owner != request.user:
+                return JsonResponse({'success': False, 'error': 'Permission denied'})
+            
+            group.color = color
+            group.save()
+            
+            return JsonResponse({'success': True})
+        except Group.DoesNotExist:
+            return JsonResponse({'success': False, 'error': 'Group not found'})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    
+    return JsonResponse({'success': False, 'error': 'Invalid request method'})
+
+@login_required
+def update_event_attendee(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            user_id = data.get('user_id')
+            event_id = data.get('event_id')
+            action = data.get('action')
+
+            if not all([user_id, event_id, action]):
+                return JsonResponse({'success': False, 'error': 'Missing required fields'})
+
+            event = Event.objects.get(id=event_id)
+            user = User.objects.get(id=user_id)
+
+            # Verify the current user has permission to modify the event
+            if not (request.user.is_staff or event.owner == request.user):
+                return JsonResponse({'success': False, 'error': 'Permission denied'})
+
+            # Check for pending substitution requests
+            pending_requests = SubstitutionRequest.objects.filter(
+                event=event,
+                status='pending'
+            ).filter(
+                Q(requesting_user=user) | Q(target_user=user)
+            )
+
+            if pending_requests.exists():
+                return JsonResponse({
+                    'success': False, 
+                    'error': 'Cannot modify attendance while there are pending substitution requests for this user'
+                })
+
+            # Check for existing substitutions
+            existing_substitution = EventSubstitution.objects.filter(
+                event=event
+            ).filter(
+                Q(original_user=user) | Q(substitute_user=user)
+            ).first()
+
+            if existing_substitution:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Cannot modify attendance for users involved in a substitution'
+                })
+
+            if action == 'add':
+                # Use EventAttendees model to maintain consistency with substitution system
+                EventAttendees.objects.get_or_create(event=event, user=user)
+            elif action == 'remove':
+                # Remove from EventAttendees
+                EventAttendees.objects.filter(event=event, user=user).delete()
+                # Also remove any check-ins or attendance records
+                EventCheckIn.objects.filter(event=event, user=user).delete()
+                EventAttendance.objects.filter(event=event, user=user).delete()
+            else:
+                return JsonResponse({'success': False, 'error': 'Invalid action'})
+
+            return JsonResponse({'success': True})
+        except (Event.DoesNotExist, User.DoesNotExist):
+            return JsonResponse({'success': False, 'error': 'Event or user not found'})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+
+    return JsonResponse({'success': False, 'error': 'Invalid request method'})
+
+@login_required
+def get_group_members(request, group_id):
+    try:
+        group = Group.objects.get(id=group_id)
+        members = group.members.all()
+        return JsonResponse({
+            'success': True,
+            'members': [{
+                'id': member.id,
+                'name': member.get_full_name() or member.username
+            } for member in members]
+        })
+    except Group.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'error': 'Group not found'
+        }, status=404)
+
+@login_required
+def add_substitution(request):
+    if not request.user.is_staff:
+        return JsonResponse({
+            'success': False,
+            'error': 'Permission denied'
+        }, status=403)
+
+    try:
+        event = Event.objects.get(id=request.POST.get('event_id'))
+        group = Group.objects.get(id=request.POST.get('group'))
+        original_user = User.objects.get(id=request.POST.get('original_user'))
+        substitute_user = User.objects.get(id=request.POST.get('substitute_user'))
+
+        # Check if original user is in the group
+        if not group.members.filter(id=original_user.id).exists():
+            return JsonResponse({
+                'success': False,
+                'error': 'Original user is not a member of the selected group'
+            }, status=400)
+
+        # Check if substitute user is in the group
+        if not group.members.filter(id=substitute_user.id).exists():
+            return JsonResponse({
+                'success': False,
+                'error': 'Substitute user is not a member of the selected group'
+            }, status=400)
+
+        # Check if substitution already exists
+        if EventSubstitution.objects.filter(
+            event=event,
+            original_user=original_user,
+            group=group
+        ).exists():
+            return JsonResponse({
+                'success': False,
+                'error': 'A substitution already exists for this user in this group'
+            }, status=400)
+
+        # Create the substitution
+        substitution = EventSubstitution.objects.create(
+            event=event,
+            original_user=original_user,
+            substitute_user=substitute_user,
+            group=group,
+            created_by=request.user
+        )
+
+        return JsonResponse({
+            'success': True,
+            'message': 'Substitution added successfully'
+        })
+
+    except (Event.DoesNotExist, Group.DoesNotExist, User.DoesNotExist):
+        return JsonResponse({
+            'success': False,
+            'error': 'Invalid event, group, or user'
+        }, status=404)
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+@login_required
+def remove_substitution(request, substitution_id):
+    if not request.user.is_staff:
+        return JsonResponse({
+            'success': False,
+            'error': 'Permission denied'
+        }, status=403)
+
+    try:
+        substitution = EventSubstitution.objects.get(id=substitution_id)
+        substitution.delete()
+        return JsonResponse({
+            'success': True,
+            'message': 'Substitution removed successfully'
+        })
+    except EventSubstitution.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'error': 'Substitution not found'
+        }, status=404)
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+@login_required
+def view_event(request, event_id):
+    event = get_object_or_404(Event, id=event_id)
+    
+    # Check if user is in any of the groups attending the event
+    user_groups = UserGroups.objects.filter(user=request.user).values_list('group', flat=True)
+    event_groups = EventGroups.objects.filter(event=event).values_list('group', flat=True)
+    user_can_attend = any(group in event_groups for group in user_groups)
+    
+    if not user_can_attend and event.owner != request.user:
+        messages.error(request, "You are not authorized to view this event.")
+        return redirect('home')
+    
+    # Get the event's timezone
+    event_tz = pytz.timezone(event.timezone)
+    
+    # Create a datetime object in the event's timezone
+    event_datetime = timezone.datetime.combine(event.date, event.time)
+    event_datetime = event_tz.localize(event_datetime)
+    
+    # Get current time in the event's timezone
+    current_time = timezone.now().astimezone(event_tz)
+    
+    # Calculate time difference
+    time_until = event_datetime - current_time
+    minutes_until = int(time_until.total_seconds() / 60)
+    
+    # Set event properties
+    event.minutes_until = minutes_until
+    event.can_check_in = -5 <= minutes_until <= 30
+    event.is_concluded = minutes_until < -5
+    event.user_check_in = EventCheckIn.objects.filter(
+        event=event,
+        user=request.user,
+        is_within_radius=True
+    ).exists()
+    
+    # Get attending groups for the event
+    event.attending_groups = []
+    for event_group in event.groups.all():
+        # Get members through membership_groups relationship
+        members = User.objects.filter(membership_groups__group=event_group.group)
+        event.attending_groups.append({
+            'id': event_group.group.id,
+            'name': event_group.group.name,
+            'color': event_group.group.color,
+            'members': members,
+            'member_count': members.count()
+        })
+    
+    # Calculate time display
+    if minutes_until >= 1440:  # More than 24 hours
+        days = minutes_until // 1440
+        remaining_minutes = minutes_until % 1440
+        hours = remaining_minutes // 60
+        event.time_display = f"{days}d {hours}h"
+    elif minutes_until >= 60:  # More than 1 hour
+        hours = minutes_until // 60
+        minutes = minutes_until % 60
+        event.time_display = f"{hours}h {minutes}m"
+    else:
+        event.time_display = f"{minutes_until}m"
+    
+    # Get substitutions for the event
+    substitutions = EventSubstitution.objects.filter(event=event).select_related(
+        'original_user', 'substitute_user', 'group'
+    )
+    
+    # Get substitution requests for the event
+    substitution_requests = SubstitutionRequest.objects.filter(event=event).select_related(
+        'requesting_user', 'target_user', 'group'
+    )
+    
+    context = {
+        'event': event,
+        'user_can_attend': user_can_attend,
+        'substitutions': substitutions,
+        'substitution_requests': substitution_requests,
+        'user': request.user,
+    }
+    
+    return render(request, 'viewevent.html', context)
+
+@login_required
+def event_checkin_page(request, event_id):
+    event = get_object_or_404(Event, id=event_id)
+    
+    # Check if user is in any of the groups attending the event
+    user_groups = UserGroups.objects.filter(user=request.user).values_list('group', flat=True)
+    event_groups = EventGroups.objects.filter(event=event).values_list('group', flat=True)
+    user_can_attend = any(group in event_groups for group in user_groups)
+    
+    if not user_can_attend and event.owner != request.user:
+        messages.error(request, "You are not authorized to view this event.")
+        return redirect('home')
+    
+    # Get the event's timezone
+    event_tz = pytz.timezone(event.timezone)
+    
+    # Create a datetime object in the event's timezone
+    event_datetime = timezone.datetime.combine(event.date, event.time)
+    event_datetime = event_tz.localize(event_datetime)
+    
+    # Get current time in the event's timezone
+    current_time = timezone.now().astimezone(event_tz)
+    
+    # Calculate time difference
+    time_until = event_datetime - current_time
+    minutes_until = int(time_until.total_seconds() / 60)
+    
+    # Set event properties
+    event.minutes_until = minutes_until
+    event.can_check_in = -5 <= minutes_until <= 30
+    event.is_concluded = minutes_until < -5
+    event.user_check_in = EventCheckIn.objects.filter(
+        event=event,
+        user=request.user,
+        is_within_radius=True
+    ).exists()
+    
+    # Get attending groups for the event
+    event.attending_groups = []
+    for event_group in event.groups.all():
+        # Get members through membership_groups relationship
+        members = User.objects.filter(membership_groups__group=event_group.group)
+        event.attending_groups.append({
+            'id': event_group.group.id,
+            'name': event_group.group.name,
+            'color': event_group.group.color,
+            'members': members,
+            'member_count': members.count()
+        })
+    
+    # Calculate time display
+    if minutes_until >= 1440:  # More than 24 hours
+        days = minutes_until // 1440
+        remaining_minutes = minutes_until % 1440
+        hours = remaining_minutes // 60
+        event.time_display = f"{days}d {hours}h"
+    elif minutes_until >= 60:  # More than 1 hour
+        hours = minutes_until // 60
+        minutes = minutes_until % 60
+        event.time_display = f"{hours}h {minutes}m"
+    else:
+        event.time_display = f"{minutes_until}m"
+    
+    context = {
+        'event': event,
+        'user_can_attend': user_can_attend,
+        'user': request.user,
+    }
+    
+    return render(request, 'event_checkin.html', context)
+
+@login_required
+def create_announcement(request, org_id):
+    if request.method == 'POST':
+        try:
+            organization = get_object_or_404(Organization, id=org_id)
+            
+            # Verify user has permission to create announcements
+            if organization.owner != request.user:
+                return JsonResponse({'error': 'You do not have permission to create announcements'}, status=403)
+            
+            # Get data from request
+            title = request.POST.get('title')
+            content = request.POST.get('content')
+            files = request.FILES.getlist('files')
+            
+            if not title or not content:
+                return JsonResponse({'error': 'Title and content are required'}, status=400)
+            
+            # Create the announcement
+            announcement = Announcement.objects.create(
+                organization=organization,
+                title=title,
+                content=content,
+                created_by=request.user
+            )
+            
+            # Handle file attachments
+            for file in files:
+                AnnouncementFile.objects.create(
+                    announcement=announcement,
+                    file=file,
+                    filename=file.name
+                )
+            
+            return JsonResponse({
+                'success': True,
+                'message': 'Announcement created successfully',
+                'announcement_id': announcement.id
+            })
+            
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+    
+    return JsonResponse({'error': 'Invalid request method'}, status=400)
+
+@login_required
+def get_announcements(request, org_id):
+    try:
+        organization = get_object_or_404(Organization, id=org_id)
+        
+        # Get announcements for the organization
+        announcements = Announcement.objects.filter(
+            organization=organization,
+            is_active=True
+        ).select_related('created_by').prefetch_related('files').order_by('-created_at')
+        
+        announcements_data = [{
+            'id': announcement.id,
+            'title': announcement.title,
+            'content': announcement.content,
+            'created_at': announcement.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+            'created_by': announcement.created_by.get_full_name() or announcement.created_by.username,
+            'files': [{
+                'id': file.id,
+                'filename': file.filename,
+                'url': file.file.url
+            } for file in announcement.files.all()]
+        } for announcement in announcements]
+        
+        return JsonResponse({
+            'success': True,
+            'announcements': announcements_data
+        })
+        
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+@login_required
+def delete_announcement(request, announcement_id):
+    if request.method == 'POST':
+        try:
+            announcement = get_object_or_404(Announcement, id=announcement_id)
+            
+            # Verify user has permission to delete
+            if announcement.organization.owner != request.user:
+                return JsonResponse({'error': 'You do not have permission to delete this announcement'}, status=403)
+            
+            # Soft delete by setting is_active to False
+            announcement.is_active = False
+            announcement.save()
+            
+            return JsonResponse({'success': True, 'message': 'Announcement deleted successfully'})
+            
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+    
+    return JsonResponse({'error': 'Invalid request method'}, status=400)
+
+@login_required
+def pending_substitution_requests(request):
+    try:
+        # Get all pending substitution requests for the current user
+        pending_requests = SubstitutionRequest.objects.filter(
+            target_user=request.user,
+            status='pending'
+        ).select_related(
+            'event',
+            'requesting_user',
+            'target_user'
+        ).order_by('-created_at')
+        
+        # Add event timezone info to each request
+        for sub_request in pending_requests:
+            try:
+                event_tz = pytz.timezone(sub_request.event.timezone)
+                event_datetime = timezone.datetime.combine(sub_request.event.date, sub_request.event.time)
+                event_datetime = event_tz.localize(event_datetime)
+                sub_request.event_datetime = event_datetime
+            except Exception as e:
+                print(f"Error processing timezone for request {sub_request.id}: {str(e)}")
+                sub_request.event_datetime = None
+        
+        context = {
+            'pending_requests': pending_requests,
+            'total_pending': pending_requests.count()
+        }
+        
+        return render(request, 'pending_substitution_requests.html', context)
+        
+    except Exception as e:
+        print(f"Error in pending_substitution_requests: {str(e)}")
+        messages.error(request, 'Error loading pending substitution requests')
+        return redirect('home')
+
+@login_required
+def get_user_group(request, event_id):
+    try:
+        event = get_object_or_404(Event, id=event_id)
+        attendee = EventAttendees.objects.get(event=event, user=request.user)
+        
+        if not attendee.group:
+            return JsonResponse({
+                'success': False,
+                'error': 'No group found for your attendance'
+            }, status=400)
+        
+        return JsonResponse({
+            'success': True,
+            'group': {
+                'id': attendee.group.id,
+                'name': attendee.group.name,
+                'color': attendee.group.color
+            }
+        })
+    except EventAttendees.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'error': 'You are not attending this event'
+        }, status=400)
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+@login_required
+def request_sub(request, event_id):
+    try:
+        event = get_object_or_404(Event, id=event_id)
+        
+        # Check if user is authorized to request substitution
+        user_can_attend = EventAttendees.objects.filter(event=event, user=request.user).exists()
+        
+        if not user_can_attend and event.owner != request.user:
+            messages.error(request, "You are not authorized to view this event.")
+            return redirect('home')
+        
+        # Get all users from the organization who aren't currently attending
+        organization_users = User.objects.filter(
+            user_organizations__organization=event.organization
+        ).exclude(
+            # Exclude users who are already attending
+            id__in=EventAttendees.objects.filter(event=event).values_list('user_id', flat=True)
+        ).exclude(
+            # Exclude the event owner
+            id=event.organization.owner.id
+        ).distinct()
+        
+        # Get pending requests count for the current user
+        pending_requests_count = SubstitutionRequest.objects.filter(
+            event=event,
+            target_user=request.user,
+            status='pending'
+        ).count()
+        
+        # Get the event's timezone
+        event_tz = pytz.timezone(event.timezone)
+        
+        # Create a datetime object in the event's timezone
+        event_datetime = timezone.datetime.combine(event.date, event.time)
+        event_datetime = event_tz.localize(event_datetime)
+        
+        # Get current time in the event's timezone
+        current_time = timezone.now().astimezone(event_tz)
+        
+        # Calculate time difference
+        time_until = event_datetime - current_time
+        minutes_until = int(time_until.total_seconds() / 60)
+        
+        # Set event properties
+        event.minutes_until = minutes_until
+        event.can_check_in = -5 <= minutes_until <= 30
+        event.is_concluded = minutes_until < -5
+        event.user_check_in = EventCheckIn.objects.filter(
+            event=event,
+            user=request.user,
+            is_within_radius=True
+        ).exists()
+        
+        # Get attending groups for the event
+        event.attending_groups = []
+        for event_group in event.groups.all():
+            # Get members through membership_groups relationship
+            members = User.objects.filter(membership_groups__group=event_group.group)
+            event.attending_groups.append({
+                'id': event_group.group.id,
+                'name': event_group.group.name,
+                'color': event_group.group.color,
+                'members': members,
+                'member_count': members.count()
+            })
+        
+        # Calculate time display
+        if minutes_until >= 1440:  # More than 24 hours
+            days = minutes_until // 1440
+            remaining_minutes = minutes_until % 1440
+            hours = remaining_minutes // 60
+            event.time_display = f"{days}d {hours}h"
+        elif minutes_until >= 60:  # More than 1 hour
+            hours = minutes_until // 60
+            minutes = minutes_until % 60
+            event.time_display = f"{hours}h {minutes}m"
+        else:
+            event.time_display = f"{minutes_until}m"
+        
+        # Get substitutions for the event
+        substitutions = EventSubstitution.objects.filter(event=event).select_related(
+            'original_user', 'substitute_user', 'created_by'
+        )
+        
+        # Get substitution requests for the event
+        substitution_requests = SubstitutionRequest.objects.filter(event=event).select_related(
+            'requesting_user', 'target_user'
+        )
+        
+        context = {
+            'event': event,
+            'user_can_attend': user_can_attend,
+            'substitutions': substitutions,
+            'substitution_requests': substitution_requests,
+            'user': request.user,
+            'organization_users': organization_users,
+            'pending_requests_count': pending_requests_count,
+        }
+        
+        return render(request, 'requestsub.html', context)
+        
+    except Exception as e:
+        print(f"Error in request_sub: {str(e)}")
+        messages.error(request, 'Error loading substitution page')
+        return redirect('home')
+
+@login_required
+def respond_to_substitution_request(request, request_id):
+    if request.method == 'POST':
+        try:
+            sub_request = get_object_or_404(SubstitutionRequest, id=request_id, target_user=request.user)
+            action = request.POST.get('action')
+            
+            if action == 'accept':
+                try:
+                    # Create substitution record
+                    EventSubstitution.objects.create(
+                        event=sub_request.event,
+                        original_user=sub_request.requesting_user,
+                        substitute_user=sub_request.target_user,
+                        created_by=sub_request.requesting_user
+                    )
+                    
+                    # Update request status
+                    sub_request.status = 'accepted'
+                    sub_request.save()
+                    
+                    # Remove the requesting user from attendees
+                    EventAttendees.objects.filter(
+                        event=sub_request.event,
+                        user=sub_request.requesting_user
+                    ).delete()
+                    
+                    # Add the target user (accepter) to attendees
+                    EventAttendees.objects.create(
+                        event=sub_request.event,
+                        user=sub_request.target_user
+                    )
+                    
+                    # Clean up check-ins and attendance records for both users
+                    EventCheckIn.objects.filter(
+                        event=sub_request.event,
+                        user__in=[sub_request.requesting_user, sub_request.target_user]
+                    ).delete()
+                    
+                    EventAttendance.objects.filter(
+                        event=sub_request.event,
+                        user__in=[sub_request.requesting_user, sub_request.target_user]
+                    ).delete()
+                    
+                    # Create new attendance record for the substitute user (accepter)
+                    EventAttendance.objects.create(
+                        event=sub_request.event,
+                        user=sub_request.target_user,
+                        is_attending=True
+                    )
+                    
+                    return JsonResponse({'success': True})
+                    
+                except Exception as e:
+                    return JsonResponse({
+                        'success': False,
+                        'error': f'Error accepting substitution request: {str(e)}'
+                    }, status=500)
+                    
+            elif action == 'reject':
+                sub_request.status = 'rejected'
+                sub_request.save()
+                return JsonResponse({'success': True})
+            else:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Invalid action'
+                }, status=400)
+                
+        except SubstitutionRequest.DoesNotExist:
+            return JsonResponse({
+                'success': False,
+                'error': 'Substitution request not found'
+            }, status=404)
+            
+    return JsonResponse({
+        'success': False,
+        'error': 'Invalid request method'
+    }, status=405)

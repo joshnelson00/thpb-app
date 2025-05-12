@@ -1,0 +1,110 @@
+<div class="event-details">
+    <h2>{{ event.name }}</h2>
+    <p>{{ event.description }}</p>
+    <p>Date: {{ event.date }}</p>
+    <p>Location: {{ event.location }}</p>
+    
+    <div class="check-in-section">
+        <button id="checkInButton" class="btn btn-primary">Check In</button>
+        <div id="checkInStatus" class="mt-2"></div>
+    </div>
+</div>
+
+<script>
+document.getElementById('checkInButton').addEventListener('click', function() {
+    if ("geolocation" in navigator) {
+        navigator.geolocation.getCurrentPosition(function(position) {
+            const latitude = position.coords.latitude;
+            const longitude = position.coords.longitude;
+            
+            const formData = new FormData();
+            formData.append('latitude', latitude);
+            formData.append('longitude', longitude);
+            
+            fetch(`/event/{{ event.id }}/check-in/`, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                const statusDiv = document.getElementById('checkInStatus');
+                if (data.success) {
+                    statusDiv.innerHTML = `
+                        <div class="alert ${data.is_within_radius ? 'alert-success' : 'alert-warning'}">
+                            ${data.message}
+                            <br>
+                            Distance from event: ${data.distance} meters
+                        </div>
+                    `;
+                } else {
+                    statusDiv.innerHTML = `
+                        <div class="alert alert-danger">
+                            ${data.error}
+                        </div>
+                    `;
+                }
+            })
+            .catch(error => {
+                document.getElementById('checkInStatus').innerHTML = `
+                    <div class="alert alert-danger">
+                        Error checking in. Please try again.
+                    </div>
+                `;
+            });
+        }, function(error) {
+            document.getElementById('checkInStatus').innerHTML = `
+                <div class="alert alert-danger">
+                    Error getting location: ${error.message}
+                </div>
+            `;
+        });
+    } else {
+        document.getElementById('checkInStatus').innerHTML = `
+            <div class="alert alert-danger">
+                Geolocation is not supported by your browser.
+            </div>
+        `;
+    }
+});
+</script>
+
+<style>
+.check-in-section {
+    margin: 20px 0;
+    padding: 15px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+}
+
+#checkInButton {
+    padding: 10px 20px;
+    font-size: 16px;
+}
+
+.alert {
+    margin-top: 10px;
+    padding: 10px;
+    border-radius: 4px;
+}
+
+.alert-success {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.alert-warning {
+    background-color: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffeeba;
+}
+
+.alert-danger {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+</style> 

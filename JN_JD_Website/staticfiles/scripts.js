@@ -82,8 +82,12 @@ document.addEventListener("DOMContentLoaded", () => {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
+                    "X-CSRFToken": "{{ csrf_token }}"
                 },
-                body: JSON.stringify({ groupName: newGroupName })
+                body: JSON.stringify({
+                    groupName: newGroupName,
+                    groupId: groupName.closest(".group-container").dataset.groupId
+                })
             })
             .then(response => response.json())
             .then(data => {
@@ -116,6 +120,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Add event listeners for both available and assigned groups (dropzones)
     [availableGroups, assignedGroups].forEach(dropzone => {
+        if (!dropzone) return;
         dropzone.addEventListener("dragover", (event) => {
             event.preventDefault();
             const afterElement = getDragAfterElement(dropzone, event.clientY);
@@ -164,5 +169,41 @@ document.addEventListener("DOMContentLoaded", () => {
         let groups = Array.from(container.children);
         groups.sort((a, b) => a.textContent.trim().localeCompare(b.textContent.trim()));
         groups.forEach(group => container.appendChild(group));
+    }
+});
+document.addEventListener("DOMContentLoaded", () => {
+    const dropzones = document.querySelectorAll(".group-users, .user-group-container-wrapper");
+
+    dropzones.forEach(dropzone => {
+        dropzone.addEventListener("drop", async (event) => {
+            event.preventDefault();
+            const id = event.dataTransfer.getData("text/plain");
+            const draggedElement = document.getElementById(id);
+
+            if (draggedElement) {
+                dropzone.appendChild(draggedElement);
+                
+                const userId = id.replace("user", "");  // Extract user ID
+                const groupContainer = dropzone.closest(".group-container");
+                const groupId = groupContainer ? groupContainer.dataset.groupId : null;
+
+                // Send an update request to the server
+                await fetch("/update-user-group/", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-CSRFToken": getCSRFToken()
+                    },
+                    body: JSON.stringify({ user_id: userId, group_id: groupId })
+                })
+                .then(response => response.json())
+                .then(data => console.log("Update successful:", data))
+                .catch(error => console.error("Error updating user group:", error));
+            }
+        });
+    });
+
+    function getCSRFToken() {
+        return document.querySelector("[name=csrfmiddlewaretoken]").value;
     }
 });

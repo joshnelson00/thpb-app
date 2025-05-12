@@ -1,8 +1,1937 @@
 {% extends 'index.html' %}
-{% load static %}
 
 {% block content %}
-<div class="content">
-    <h1>Home Page</h1>
+<div class="home-container">
+    <div class="welcome-section">
+        <h1><i class="fas fa-hand-wave"></i> Hello, {{ request.user.f_name }}!</h1>
+        <p class="welcome-message">Welcome back to SoundCheq. Here's what's happening today.</p>
+    </div>
+
+    <div class="dashboard-grid">
+        <div class="dashboard-column">
+            <!-- Upcoming Events Section -->
+            <div class="dashboard-card">
+                <div class="card-header">
+                    <h2><i class="fas fa-calendar-alt"></i> Upcoming Events</h2>
+                    <a href="{% url 'viewevents' %}" class="view-all-link">View All <i class="fas fa-arrow-right"></i></a>
+                </div>
+                <div class="card-content">
+                    {% if upcoming_events %}
+                        {% for event in upcoming_events %}
+                        {% if event.owner == request.user or event.user_can_attend %}
+                        <div class="event-item">
+                            <div class="event-date">
+                                <span class="day">{{ event.date|date:"d" }}</span>
+                                <span class="month">{{ event.date|date:"M" }}</span>
+                            </div>
+                            <div class="event-details">
+                                <h3>{{ event.name }}</h3>
+                                <p class="event-time"><i class="fas fa-calendar"></i> {{ event.date|date:"F j, Y" }} at {{ event.time|time:"g:i A" }}</p>
+                                <p class="event-location"><i class="fas fa-map-marker-alt"></i> {{ event.location }}</p>
+                                <div class="event-groups">
+                                    <span class="groups-label">Groups:</span>
+                                    {% for group in event.attending_groups %}
+                                    <div class="event-group" style="--group-color: {{ group.color }}">
+                                        {{ group.name }}
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                                
+                                <div class="event-status">
+                                    {% if event.minutes_until > 30 %}
+                                        <div class="status-badge upcoming">
+                                            <i class="fas fa-hourglass-half"></i>
+                                            {{ event.time_display }}
+                                        </div>
+                                    {% elif event.minutes_until >= -5 %}
+                                        <div class="status-badge in-progress">
+                                            <i class="fas fa-play-circle"></i>
+                                            Event in progress
+                                        </div>
+                                        {% if not event.owner == request.user and not event.user_check_in %}
+                                            <div class="check-in-spacer"></div>
+                                            <button class="action-btn check-in check-in-btn" data-event-id="{{ event.id }}">
+                                                <i class="fas fa-map-marker-alt"></i>
+                                                Check In
+                                            </button>
+                                        {% endif %}
+                                    {% else %}
+                                        <div class="status-badge past">
+                                            <i class="fas fa-calendar-check"></i>
+                                            Event Ended
+                                        </div>
+                                        {% if event.owner == request.user %}
+                                            <div class="check-in-spacer"></div>
+                                            <a href="{% url 'event_attendance' event.id %}" class="action-btn view-attendance">
+                                                <i class="fas fa-clipboard-list"></i>
+                                                View Attendance
+                                            </a>
+                                        {% endif %}
+                                    {% endif %}
+
+                                    {% if event.owner == request.user %}
+                                        <a href="{% url 'editevent' event.id %}" class="action-btn edit">
+                                            <i class="fas fa-edit"></i>
+                                            Edit Event
+                                        </a>
+                                    {% endif %}
+
+                                    {% if not event.owner == request.user %}
+                                        {% if event.user_check_in %}
+                                            <div class="check-in-status checked-in">
+                                                <i class="fas fa-check-circle"></i>
+                                                Checked in
+                                            </div>
+                                        {% endif %}
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                        {% endfor %}
+                    {% else %}
+                        <div class="empty-state">
+                            <i class="fas fa-calendar-plus"></i>
+                            <p>No upcoming events</p>
+                            <div class="action-hint">
+                                Create an event to get started
+                            </div>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="dashboard-column">
+            <!-- Recent Announcements Section -->
+            <div class="dashboard-card">
+                <div class="card-header">
+                    <h2><i class="fas fa-bullhorn"></i> Recent Announcements</h2>
+                    <a href="{% url 'view_announcements' %}" class="view-all-link">View All <i class="fas fa-arrow-right"></i></a>
+                </div>
+                <div class="announcements-container">
+                    {% if announcements %}
+                        {% for announcement in announcements %}
+                            <div class="announcement-card">
+                                <div class="announcement-header">
+                                    <div class="announcement-title-group">
+                                        <h4>{{ announcement.title }}</h4>
+                                        <div class="announcement-meta">
+                                            <span><i class="fas fa-building"></i> {{ announcement.organization.name }}</span>
+                                            <span><i class="fas fa-user"></i> {{ announcement.created_by.f_name }} {{ announcement.created_by.l_name }}</span>
+                                            <span><i class="fas fa-clock"></i> {{ announcement.created_at|date:"M d, Y" }}</span>
+                                        </div>
+                                    </div>
+                                    {% if announcement.created_by == request.user %}
+                                        <div class="announcement-actions">
+                                            <button class="edit-btn" onclick="editAnnouncement('{{ announcement.id }}')">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                            <button class="delete-announcement-btn" onclick="deleteAnnouncement('{{ announcement.id }}')">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                                <div class="announcement-content">
+                                    {{ announcement.content|linebreaks }}
+                                </div>
+                                {% if announcement.files.all %}
+                                    <div class="announcement-files">
+                                        <h5><i class="fas fa-paperclip"></i> Attachments</h5>
+                                        <div class="file-grid">
+                                            {% for file in announcement.files.all %}
+                                                <a href="{{ file.file.url }}" class="file-link" target="_blank">
+                                                    <i class="fas fa-file"></i>
+                                                    <span class="file-name">{{ file.filename }}</span>
+                                                </a>
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                {% endif %}
+                            </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="empty-state">
+                            <i class="fas fa-bullhorn"></i>
+                            <p>No announcements yet.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Organizations I Own Section -->
+            {% if owned_organizations %}
+            <div class="dashboard-card">
+                <div class="card-header">
+                    <h2><i class="fas fa-crown"></i> My Organizations</h2>
+                    <a href="{% url 'vieworgs' %}" class="view-all-link">View All <i class="fas fa-arrow-right"></i></a>
+                </div>
+                <div class="card-content">
+                    {% for org in owned_organizations %}
+                    <div class="org-item">
+                        <div class="org-header">
+                            <div class="org-icon">
+                                <i class="fas fa-building"></i>
+                            </div>
+                            <div class="org-details">
+                                <h3>{{ org.name }}</h3>
+                                <span class="owner-badge">Owner</span>
+                            </div>
+                        </div>
+                        {% if org.groups.all %}
+                        <div class="org-groups">
+                            <h4>Groups ({{ org.groups.count }})</h4>
+                            <div class="groups-list">
+                                {% for group in org.groups.all %}
+                                <div class="mini-group-item">
+                                    <i class="fas fa-user-friends"></i>
+                                    <span>{{ group.name }}</span>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Organizations I'm a Member Of Section -->
+            {% if member_organizations %}
+            <div class="dashboard-card">
+                <div class="card-header">
+                    <h2><i class="fas fa-users"></i> Member Organizations</h2>
+                    <a href="{% url 'vieworgs' %}" class="view-all-link">View All <i class="fas fa-arrow-right"></i></a>
+                </div>
+                <div class="card-content">
+                    {% for org in member_organizations %}
+                    <div class="org-item">
+                        <div class="org-header">
+                            <div class="org-icon">
+                                <i class="fas fa-building"></i>
+                            </div>
+                            <div class="org-details">
+                                <h3>{{ org.name }}</h3>
+                                <span class="member-badge">Member</span>
+                            </div>
+                        </div>
+                        {% if org.groups.all %}
+                        <div class="org-groups">
+                            <h4>Groups ({{ org.groups.count }})</h4>
+                            <div class="groups-list">
+                                {% for group in org.groups.all %}
+                                <div class="mini-group-item">
+                                    <i class="fas fa-user-friends"></i>
+                                    <span>{{ group.name }}</span>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="dashboard-column">
+            <!-- Quick Actions Section -->
+            <div class="dashboard-card">
+                <div class="card-header">
+                    <h2><i class="fas fa-bolt"></i> Quick Actions</h2>
+                </div>
+                <div class="card-content">
+                    <div class="quick-actions-grid">
+                        <a href="{% url 'createorg' %}" class="quick-action-btn">
+                            <i class="fas fa-building"></i>
+                            <span>Create Organization</span>
+                            <div class="description">Start your own organization</div>
+                        </a>
+                        <a href="{% url 'joinorg' %}" class="quick-action-btn">
+                            <i class="fas fa-sign-in-alt"></i>
+                            <span>Join Organization</span>
+                            <div class="description">Join an existing organization</div>
+                        </a>
+                        <a href="{% url 'createevent' %}" class="quick-action-btn">
+                            <i class="fas fa-plus-circle"></i>
+                            <span>Create Event</span>
+                            <div class="description">Schedule a new event</div>
+                        </a>
+                        <a href="{% url 'creategroup' %}" class="quick-action-btn">
+                            <i class="fas fa-user-plus"></i>
+                            <span>Create Group</span>
+                            <div class="description">Create a new group</div>
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- My Groups Section -->
+            <div class="dashboard-card">
+                <div class="card-header">
+                    <h2><i class="fas fa-users"></i> My Groups</h2>
+                    <a href="{% url 'vieworgs' %}" class="view-all-link">View All <i class="fas fa-arrow-right"></i></a>
+                </div>
+                <div class="card-content">
+                    {% if user_groups %}
+                        {% for group in user_groups %}
+                        <div class="group-item">
+                            <div class="group-icon">
+                                <i class="fas fa-user-friends"></i>
+                            </div>
+                            <div class="group-details">
+                                <div class="group-header">
+                                <h3>{{ group.group.name }}</h3>
+                                    <span class="member-count">{{ group.group.user_groups.count }} members</span>
+                                </div>
+                                <p class="group-org">{{ group.group.organization.name }}</p>
+                                {% if group.role %}
+                                    <span class="role-badge">{{ group.role }}</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="empty-state">
+                            <i class="fas fa-users"></i>
+                            <p>You're not in any groups yet</p>
+                            <div class="action-hint">
+                                Join an organization or create your own to start creating groups
+                            </div>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
+
+<!-- Create Announcement Modal -->
+<div id="announcement-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 id="modal-title"><i class="fas fa-bullhorn"></i> <span>Create Announcement</span></h2>
+            <button class="close-modal">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form id="announcement-form" enctype="multipart/form-data">
+                {% csrf_token %}
+                <input type="hidden" id="announcement-id" name="announcement_id">
+                <div class="form-group">
+                    <label for="announcement-org">Organization</label>
+                    <select id="announcement-org" name="org_id" required>
+                        <option value="">Select an organization</option>
+                        {% for org in owned_organizations %}
+                            <option value="{{ org.id }}">{{ org.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="announcement-title">Title</label>
+                    <input type="text" id="announcement-title" name="title" required>
+                </div>
+                <div class="form-group">
+                    <label for="announcement-content">Content</label>
+                    <textarea id="announcement-content" name="content" required></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="announcement-files">
+                        <i class="fas fa-paperclip"></i> Attachments
+                        <span class="file-hint">(Optional)</span>
+                    </label>
+                    <div class="file-upload-wrapper">
+                        <input type="file" id="announcement-files" name="files" multiple>
+                        <div class="file-upload-info">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                            <span>Drop files here or click to upload</span>
+                        </div>
+                    </div>
+                    <div id="selected-files" class="selected-files"></div>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="cancel-btn" onclick="closeModal()">Cancel</button>
+                    <button type="submit" class="submit-btn">
+                        <i class="fas fa-save"></i>
+                        <span id="submit-text">Create Announcement</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+    .home-container {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 2rem;
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    .welcome-section {
+        text-align: center;
+        margin-bottom: 2rem;
+        padding-bottom: 1.5rem;
+        border-bottom: 1px solid var(--medium-blue-slate);
+    }
+
+    .welcome-section h1 {
+        color: var(--text-light);
+        font-size: 2.5rem;
+        margin-bottom: 0.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.75rem;
+    }
+
+    .welcome-section h1 i {
+        color: var(--periwinkle);
+    }
+
+    .welcome-message {
+        color: var(--text-muted);
+        font-size: 1.1rem;
+    }
+
+    .dashboard-grid {
+        display: grid;
+        grid-template-columns: 1fr 1.4fr 1fr;
+        gap: 1.5rem;
+        width: 100%;
+        margin: 0 auto;
+    }
+
+    .dashboard-column {
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+        min-width: 0;
+    }
+
+    .dashboard-card {
+        background: linear-gradient(to bottom, var(--card-bg) 0%, var(--dark-bg) 100%);
+        border-radius: 12px;
+        padding: 1.5rem;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        border: 1px solid var(--medium-blue-slate);
+        height: fit-content;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.25rem;
+        padding-bottom: 0.75rem;
+        border-bottom: 1px solid var(--medium-blue-slate);
+    }
+
+    .card-header h2 {
+        color: var(--text-light);
+        font-size: 1.3rem;
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .card-header h2 i {
+        color: var(--periwinkle);
+    }
+
+    .view-all-link {
+        color: var(--periwinkle);
+        text-decoration: none;
+        font-size: 0.9rem;
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+        transition: all 0.3s ease;
+    }
+
+    .view-all-link:hover {
+        color: var(--text-light);
+        transform: translateX(2px);
+    }
+
+    .event-item {
+        display: flex;
+        gap: 1rem;
+        padding: 1rem;
+        background: var(--darker-bg);
+        border-radius: 12px;
+        margin-bottom: 1rem;
+        border: 1px solid var(--medium-blue-slate);
+        transition: all 0.3s ease;
+    }
+
+    .event-item:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+
+    .event-date {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: var(--medium-blue-slate);
+        padding: 0.75rem;
+        border-radius: 8px;
+        width: 70px;
+        height: 70px;
+        flex-shrink: 0;
+    }
+
+    .event-date .day {
+        font-size: 1.75rem;
+        font-weight: bold;
+        color: var(--white);
+        line-height: 1;
+    }
+
+    .event-date .month {
+        font-size: 0.9rem;
+        color: var(--white);
+        text-transform: uppercase;
+        margin-top: 0.15rem;
+    }
+
+    .event-details {
+        flex: 1;
+    }
+
+    .event-details h3 {
+        color: var(--text-light);
+        margin: 0 0 0.5rem 0;
+        font-size: 1.1rem;
+    }
+
+    .event-time, .event-location, .event-groups {
+        color: var(--text-muted);
+        margin: 0.3rem 0;
+        font-size: 0.85rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .event-groups {
+        margin: 0.5rem 0;
+        color: var(--text-muted);
+        font-size: 0.9rem;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+    }
+
+    .groups-label {
+        color: var(--text-muted);
+        font-size: 0.9rem;
+    }
+
+    .event-group {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        padding: 0.25rem 0.6rem;
+        background: var(--darker-bg);
+        border-radius: 25px;
+        color: var(--white);
+        margin: 0.1rem;
+        font-size: 0.8rem;
+        white-space: nowrap;
+        border: 1px solid var(--group-color, var(--medium-blue-slate));
+        transition: all 0.3s ease;
+    }
+
+    .event-group:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        background: var(--dark-bg);
+    }
+
+    .event-group i {
+        font-size: 0.75rem;
+        opacity: 0.9;
+    }
+
+    .group-tag {
+        background-color: var(--darker-bg);
+        color: var(--text-light);
+        padding: 0.2rem 0.6rem;
+        border-radius: 12px;
+        font-size: 0.8rem;
+        border: 1px solid var(--medium-blue-slate);
+        display: inline-flex;
+        align-items: center;
+        margin: 0.15rem 0;
+        white-space: normal;
+        word-break: break-word;
+        line-height: 1.2;
+    }
+
+    .event-status {
+        display: flex;
+        align-items: flex-start;
+        flex-wrap: wrap;
+        margin-top: 1rem;
+        gap: 0.75rem;
+        width: 100%;
+    }
+
+    .status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.4rem 0.6rem;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        white-space: nowrap;
+    }
+
+    .status-badge.upcoming {
+        background: var(--medium-blue-slate);
+        color: var(--white);
+    }
+
+    .status-badge.in-progress {
+        background: var(--celadon);
+        color: var(--rich-black);
+    }
+
+    .status-badge.past {
+        background: var(--text-muted);
+        color: var(--white);
+    }
+
+    .action-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        padding: 0.4rem 0.6rem;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        text-decoration: none;
+        border: none;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        white-space: nowrap;
+    }
+
+    .action-btn.check-in {
+        background: var(--celadon);
+        color: var(--rich-black);
+    }
+
+    .action-btn.edit {
+        background: var(--periwinkle);
+        color: var(--rich-black);
+    }
+
+    .action-btn.view-attendance {
+        background: var(--medium-blue-slate);
+        color: var(--white);
+    }
+
+    .action-btn:hover {
+        transform: translateY(-2px);
+        filter: brightness(1.1);
+    }
+
+    .check-in-status {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        color: var(--celadon);
+        font-size: 0.8rem;
+        white-space: nowrap;
+    }
+
+    .check-in-status.checked-in {
+        background-color: #e6f4ea;
+        color: #1e7e34;
+        padding: 0.3rem 0.6rem;
+        border-radius: 15px;
+        font-size: 0.8rem;
+    }
+
+    .group-item {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 0.9rem;
+        background: var(--darker-bg);
+        border-radius: 8px;
+        margin-bottom: 0.9rem;
+        border: 1px solid var(--medium-blue-slate);
+        transition: transform 0.3s ease;
+    }
+
+    .group-item:hover {
+        transform: translateY(-2px);
+    }
+
+    .group-icon {
+        background: var(--medium-blue-slate);
+        color: var(--white);
+        width: 35px;
+        height: 35px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.1rem;
+    }
+
+    .group-details {
+        flex: 1;
+    }
+
+    .group-header {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin-bottom: 0.25rem;
+    }
+
+    .group-header h3 {
+        margin: 0;
+        font-size: 1.1rem;
+    }
+
+    .member-count {
+        color: var(--text-muted);
+        font-size: 0.8rem;
+        background: var(--darker-bg);
+        padding: 0.2rem 0.5rem;
+        border-radius: 12px;
+        border: 1px solid var(--medium-blue-slate);
+    }
+
+    .group-org {
+        color: var(--text-muted);
+        margin: 0;
+        font-size: 0.85rem;
+    }
+
+    .role-badge {
+        display: inline-block;
+        background: var(--periwinkle);
+        color: var(--rich-black);
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.8rem;
+        margin-top: 0.5rem;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 1.5rem;
+        color: var(--text-muted);
+        background-color: var(--darker-bg) !important;
+        border: 1px solid var(--medium-blue-slate);
+        border-radius: 12px;
+        position: relative;
+        transition: all 0.3s ease;
+        width: 100%;
+        box-sizing: border-box;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        min-height: 200px;
+    }
+
+    .empty-state:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+        border-color: var(--periwinkle);
+        background: linear-gradient(135deg, var(--darker-bg) 0%, var(--card-bg) 100%) !important;
+    }
+
+    .empty-state i {
+        font-size: 2.5rem;
+        margin-bottom: 1rem;
+        color: var(--periwinkle);
+        opacity: 0.8;
+    }
+
+    .empty-state p {
+        font-size: 1.1rem;
+        margin-bottom: 1rem;
+        color: var(--text-light);
+    }
+
+    .empty-state .action-hint {
+        font-size: 0.9rem;
+        color: var(--text-muted);
+        margin-top: 0.5rem;
+        padding-top: 0.5rem;
+        border-top: 1px solid var(--medium-blue-slate);
+    }
+
+    .quick-actions-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1rem;
+        margin-top: 1rem;
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    .quick-action-btn {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 0.75rem;
+        padding: 1.25rem;
+        background: var(--darker-bg);
+        border: 1px solid var(--medium-blue-slate);
+        border-radius: 8px;
+        color: var(--text-light);
+        text-decoration: none;
+        transition: all 0.3s ease;
+        text-align: center;
+        aspect-ratio: 1;
+        width: 100%;
+        box-sizing: border-box;
+        min-width: 0;
+    }
+
+    .quick-action-btn i {
+        font-size: 1.75rem;
+        color: var(--periwinkle);
+        transition: all 0.3s ease;
+    }
+
+    .quick-action-btn span {
+        font-size: 0.95rem;
+        font-weight: 500;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        width: 100%;
+        transition: all 0.3s ease;
+    }
+
+    .quick-action-btn .description {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        margin-top: 0.25rem;
+        padding: 0 0.5rem;
+        line-height: 1.2;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        transition: all 0.3s ease;
+    }
+
+    .quick-action-btn:hover {
+        transform: translateY(-2px);
+        background: var(--dark-bg);
+        border-color: var(--periwinkle);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+
+    .quick-action-btn:hover i {
+        transform: scale(1.1);
+        color: var(--periwinkle);
+    }
+
+    .quick-action-btn:hover span {
+        color: var(--white);
+    }
+
+    .quick-action-btn:hover .description {
+        color: var(--text-light);
+    }
+
+    .org-item {
+        background: var(--darker-bg);
+        border-radius: 8px;
+        margin-bottom: 1rem;
+        border: 1px solid var(--medium-blue-slate);
+        overflow: hidden;
+    }
+
+    .org-header {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 1rem;
+        background: linear-gradient(to right, var(--card-bg) 0%, var(--dark-bg) 100%);
+        border-bottom: 1px solid var(--medium-blue-slate);
+    }
+
+    .org-icon {
+        background: var(--medium-blue-slate);
+        color: var(--white);
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.2rem;
+    }
+
+    .org-details {
+        flex: 1;
+    }
+
+    .org-details h3 {
+        color: var(--text-light);
+        margin: 0 0 0.25rem 0;
+        font-size: 1.1rem;
+    }
+
+    .owner-badge {
+        display: inline-block;
+        background: var(--celadon);
+        color: var(--rich-black);
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.8rem;
+    }
+
+    .member-badge {
+        display: inline-block;
+        background: var(--periwinkle);
+        color: var(--rich-black);
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.8rem;
+    }
+
+    .org-groups {
+        padding: 1rem;
+    }
+
+    .org-groups h4 {
+        color: var(--text-muted);
+        margin: 0 0 0.75rem 0;
+        font-size: 0.9rem;
+    }
+
+    .groups-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+    .mini-group-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 0.75rem;
+        background: var(--card-bg);
+        border-radius: 4px;
+        font-size: 0.9rem;
+        color: var(--text-light);
+        border: 1px solid var(--medium-blue-slate);
+    }
+
+    .mini-group-item i {
+        color: var(--periwinkle);
+        font-size: 0.9rem;
+    }
+
+    @media (max-width: 1200px) {
+        .dashboard-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    @media (max-width: 768px) {
+        .home-container {
+            padding: 1rem;
+        }
+
+        .dashboard-grid {
+            grid-template-columns: 1fr;
+            gap: 1rem;
+        }
+
+        .dashboard-column {
+            width: 100%;
+        }
+
+        .event-item {
+            flex-direction: column;
+            padding: 0.75rem;
+        }
+
+        .event-date {
+            width: 100%;
+            height: auto;
+            flex-direction: row;
+            justify-content: center;
+            gap: 1rem;
+            padding: 0.5rem;
+        }
+
+        .event-status {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .action-btn {
+            width: 100%;
+            justify-content: center;
+        }
+    }
+
+    @media (max-width: 578px) {
+        .home-container {
+            padding: 0.75rem;
+        }
+
+        .welcome-section h1 {
+            font-size: 1.5rem;
+        }
+
+        .welcome-message {
+            font-size: 0.9rem;
+        }
+
+        .card-header {
+            flex-direction: column;
+            gap: 0.5rem;
+            align-items: flex-start;
+        }
+
+        .view-all-link {
+            align-self: flex-end;
+        }
+
+        .event-groups {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .event-group {
+            width: 100%;
+            justify-content: center;
+        }
+
+        .quick-actions-grid {
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.75rem;
+        }
+
+        .quick-action-btn {
+            padding: 1rem;
+        }
+
+        .quick-action-btn i {
+            font-size: 1.5rem;
+        }
+
+        .quick-action-btn span {
+            font-size: 0.85rem;
+        }
+
+        .quick-action-btn .description {
+            font-size: 0.75rem;
+            -webkit-line-clamp: 2;
+        }
+    }
+
+    /* Announcements Section Styles */
+    .announcements-container {
+        flex: 1;
+        max-height: 600px;
+        overflow-y: auto;
+        padding: 1rem;
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    .announcements-container::-webkit-scrollbar {
+        width: 8px;
+        margin-left: 0.5rem;
+    }
+
+    .announcements-container::-webkit-scrollbar-track {
+        background: var(--darker-bg);
+        border-radius: 4px;
+        margin: 0.5rem 0;
+    }
+
+    .announcements-container::-webkit-scrollbar-thumb {
+        background: var(--medium-blue-slate);
+        border-radius: 4px;
+    }
+
+    .announcements-container::-webkit-scrollbar-thumb:hover {
+        background: var(--periwinkle);
+    }
+
+    .announcements-container:empty {
+        display: grid;
+        place-items: center;
+    }
+
+    .announcement-card {
+        background-color: var(--darker-bg) !important;
+        border: 1px solid var(--medium-blue-slate);
+        border-radius: 12px;
+        padding: 2rem;
+        position: relative;
+        transition: all 0.3s ease;
+        width: 100%;
+        box-sizing: border-box;
+        min-height: unset;
+        height: auto;
+        max-height: unset;
+        overflow: visible;
+    }
+
+    .announcement-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+        border-color: var(--periwinkle);
+        background: linear-gradient(135deg, var(--darker-bg) 0%, var(--card-bg) 100%) !important;
+    }
+
+    .announcement-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 2rem;
+        gap: 1rem;
+    }
+
+    .announcement-title-group {
+        flex: 1;
+    }
+
+    .announcement-title-group h4 {
+        color: var(--text-light);
+        margin: 0 0 1rem 0;
+        font-size: 1.5rem;
+        font-weight: 700;
+        background: linear-gradient(135deg, var(--periwinkle) 0%, var(--medium-blue-slate) 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        letter-spacing: -0.5px;
+        position: relative;
+        display: inline-block;
+        padding-bottom: 0.25rem;
+    }
+
+    .announcement-title-group h4::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        height: 3px;
+        background: linear-gradient(90deg, var(--periwinkle) 0%, var(--medium-blue-slate) 100%);
+        border-radius: 2px;
+        transform: scaleX(0);
+        transform-origin: left;
+        opacity: 0;
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
+    }
+
+    .announcement-card:hover .announcement-title-group h4::after {
+        transform: scaleX(1);
+        opacity: 1;
+    }
+
+    .announcement-card:not(:hover) .announcement-title-group h4::after {
+        transform: scaleX(0);
+        opacity: 0;
+    }
+
+    .announcement-meta {
+        color: var(--text-muted);
+        font-size: 0.9rem;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
+
+    .announcement-meta i {
+        color: var(--periwinkle);
+    }
+
+    .announcement-content {
+        color: var(--text-light);
+        line-height: 1.8;
+        margin-bottom: 2rem;
+        font-size: 0.9rem;
+        min-height: unset;
+        height: auto;
+        max-height: unset;
+        overflow: visible;
+        word-break: break-word;
+        overflow-wrap: anywhere;
+    }
+
+    .announcement-content p {
+        color: var(--white);
+        margin: 0.5rem 0;
+        font-size: 0.95rem;
+    }
+
+    .announcement-files {
+        background: var(--darker-bg);
+        border-radius: 8px;
+        padding: 1rem;
+        margin-top: 1rem;
+        border: 1px solid var(--medium-blue-slate);
+    }
+
+    .announcement-files h5 {
+        color: var(--text-light);
+        margin: 0 0 0.75rem 0;
+        font-size: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .file-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+        gap: 0.75rem;
+    }
+
+    .file-link {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        color: var(--text-light);
+        text-decoration: none;
+        padding: 0.5rem 0.75rem;
+        border-radius: 6px;
+        background: var(--card-bg);
+        transition: all 0.3s ease;
+        border: 1px solid var(--medium-blue-slate);
+        cursor: pointer;
+        font-size: 0.9rem;
+    }
+
+    .file-link:hover {
+        background: var(--medium-blue-slate);
+        color: var(--white);
+        transform: translateY(-2px);
+    }
+
+    .file-name {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .create-announcement-btn {
+        background: var(--medium-blue-slate);
+        color: var(--white);
+        border: none;
+        padding: 0.75rem 1.5rem;
+        border-radius: 8px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        font-size: 1rem;
+        transition: all 0.3s ease;
+    }
+
+    .create-announcement-btn:hover {
+        background: var(--periwinkle);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(102, 102, 255, 0.2);
+    }
+
+    .announcement-actions {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .edit-btn, .delete-announcement-btn {
+        background: none;
+        border: none;
+        padding: 0.25rem;
+        border-radius: 4px;
+        transition: all 0.3s ease;
+        cursor: pointer;
+    }
+
+    .edit-btn {
+        color: var(--periwinkle);
+    }
+
+    .edit-btn:hover {
+        color: var(--white);
+        background: rgba(102, 102, 255, 0.1);
+    }
+
+    .delete-announcement-btn {
+        color: #dc3545;
+    }
+
+    .delete-announcement-btn:hover {
+        color: #bd2130;
+        background: rgba(220, 53, 69, 0.1);
+    }
+
+    /* Modal Styles */
+    .modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.8);
+        z-index: 9999;
+        justify-content: center;
+        align-items: center;
+        backdrop-filter: blur(5px);
+    }
+
+    .modal-content {
+        background: linear-gradient(135deg, var(--card-bg) 0%, var(--darker-bg) 100%);
+        border-radius: 15px;
+        padding: 2rem;
+        width: 90%;
+        max-width: 700px;
+        max-height: 90vh;
+        overflow-y: auto;
+        border: 1px solid var(--medium-blue-slate);
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid var(--medium-blue-slate);
+    }
+
+    .modal-header h2 {
+        color: var(--text-light);
+        font-size: 1.8rem;
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .modal-header h2 i {
+        color: var(--periwinkle);
+    }
+
+    .close-modal {
+        background: none;
+        border: none;
+        color: var(--text-light);
+        font-size: 1.5rem;
+        cursor: pointer;
+        padding: 0.5rem;
+        transition: all 0.3s ease;
+    }
+
+    .close-modal:hover {
+        color: var(--periwinkle);
+        transform: rotate(90deg);
+    }
+
+    .form-group {
+        margin-bottom: 1.5rem;
+    }
+
+    .form-group label {
+        display: block;
+        margin-bottom: 0.75rem;
+        color: var(--text-light);
+        font-size: 1.1rem;
+    }
+
+    .form-group select {
+        width: 100%;
+        padding: 1rem;
+        border: 1px solid var(--medium-blue-slate);
+        border-radius: 8px;
+        background: var(--darker-bg);
+        color: var(--text-light);
+        font-size: 1rem;
+        transition: all 0.3s ease;
+        cursor: pointer;
+    }
+
+    .form-group select:focus {
+        border-color: var(--periwinkle);
+        box-shadow: 0 0 0 2px rgba(102, 102, 255, 0.2);
+        outline: none;
+    }
+
+    .form-group input[type="text"],
+    .form-group textarea {
+        width: 100%;
+        padding: 1rem;
+        border: 1px solid var(--medium-blue-slate);
+        border-radius: 8px;
+        background: var(--darker-bg);
+        color: var(--text-light);
+        font-size: 1rem;
+        transition: all 0.3s ease;
+    }
+
+    .form-group input[type="text"]:focus,
+    .form-group textarea:focus {
+        border-color: var(--periwinkle);
+        box-shadow: 0 0 0 2px rgba(102, 102, 255, 0.2);
+        outline: none;
+    }
+
+    .form-group textarea {
+        min-height: 200px;
+        resize: vertical;
+        line-height: 1.6;
+    }
+
+    .file-upload-wrapper {
+        position: relative;
+        padding: 2rem;
+        border: 2px dashed var(--medium-blue-slate);
+        border-radius: 8px;
+        text-align: center;
+        transition: all 0.3s ease;
+        background: var(--darker-bg);
+    }
+
+    .file-upload-wrapper:hover {
+        border-color: var(--periwinkle);
+        background: rgba(102, 102, 255, 0.1);
+    }
+
+    .file-upload-wrapper input[type="file"] {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        opacity: 0;
+        cursor: pointer;
+    }
+
+    .file-upload-info {
+        color: var(--text-muted);
+    }
+
+    .file-upload-info i {
+        font-size: 2rem;
+        margin-bottom: 0.5rem;
+        color: var(--periwinkle);
+    }
+
+    .selected-files {
+        margin-top: 1rem;
+        display: grid;
+        gap: 0.5rem;
+    }
+
+    .selected-file {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem;
+        background: var(--darker-bg);
+        border: 1px solid var(--medium-blue-slate);
+        border-radius: 6px;
+    }
+
+    .selected-file i {
+        color: var(--periwinkle);
+    }
+
+    .selected-file span {
+        flex: 1;
+        color: var(--text-light);
+    }
+
+    .form-actions {
+        display: flex;
+        gap: 1rem;
+        margin-top: 2rem;
+    }
+
+    .cancel-btn {
+        background: var(--darker-bg);
+        color: var(--text-light);
+        border: 1px solid var(--medium-blue-slate);
+        padding: 0.75rem 1.5rem;
+        border-radius: 8px;
+        cursor: pointer;
+        flex: 1;
+        transition: all 0.3s ease;
+    }
+
+    .cancel-btn:hover {
+        background: var(--card-bg);
+        border-color: var(--periwinkle);
+    }
+
+    .submit-btn {
+        background: var(--medium-blue-slate);
+        color: var(--white);
+        border: none;
+        padding: 0.75rem 1.5rem;
+        border-radius: 8px;
+        cursor: pointer;
+        flex: 2;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.75rem;
+        font-size: 1rem;
+        transition: all 0.3s ease;
+    }
+
+    .submit-btn:hover {
+        background: var(--periwinkle);
+        transform: translateY(-2px);
+    }
+
+    @media (max-width: 768px) {
+        .announcements-container {
+            max-height: 400px;
+            padding: 0.5rem;
+            width: 100%;
+            margin: 0;
+        }
+
+        .announcements-container::-webkit-scrollbar {
+            width: 6px;
+            margin-left: 0.25rem;
+        }
+
+        .announcement-card {
+            padding: 1.25rem;
+            margin: 0;
+            width: 100%;
+        }
+    }
+
+    @media (max-width: 578px) {
+        .announcements-container {
+            padding: 0.25rem;
+        }
+
+        .announcement-card {
+            padding: 1rem;
+        }
+
+        .announcement-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 0.5rem;
+        }
+
+        .announcement-meta {
+            font-size: 0.8rem;
+        }
+    }
+
+    .remove-file {
+        background: none;
+        border: none;
+        color: var(--text-muted);
+        cursor: pointer;
+        padding: 0.25rem;
+        border-radius: 4px;
+        transition: all 0.3s ease;
+    }
+
+    .remove-file:hover {
+        color: #dc3545;
+        background: rgba(220, 53, 69, 0.1);
+    }
+</style>
+
+<script>
+    let isEditing = false;
+
+    // Show announcement modal
+    function showAnnouncementModal() {
+        const modal = document.getElementById('announcement-modal');
+        document.getElementById('announcement-id').value = '';
+        document.getElementById('modal-title').querySelector('span').textContent = 'Create Announcement';
+        document.getElementById('submit-text').textContent = 'Create Announcement';
+        document.getElementById('announcement-form').reset();
+        document.getElementById('selected-files').innerHTML = '';
+        modal.style.display = 'flex';
+        isEditing = false;
+    }
+
+    // Edit announcement
+    function editAnnouncement(id) {
+        const modal = document.getElementById('announcement-modal');
+        document.getElementById('announcement-id').value = id;
+        document.getElementById('modal-title').querySelector('span').textContent = 'Edit Announcement';
+        document.getElementById('submit-text').textContent = 'Save Changes';
+        
+        // Fetch announcement details
+        fetch(`/announcement/${id}/details/`)
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('announcement-title').value = data.title;
+                document.getElementById('announcement-content').value = data.content;
+                document.getElementById('announcement-org').value = data.organization_id;
+            })
+            .catch(error => {
+                console.error('Error fetching announcement details:', error);
+            });
+        
+        // Fetch existing files
+        fetch(`/announcement/${id}/files/`)
+            .then(response => response.json())
+            .then(data => {
+                const selectedFiles = document.getElementById('selected-files');
+                selectedFiles.innerHTML = '';
+                
+                data.files.forEach(file => {
+                    const fileDiv = document.createElement('div');
+                    fileDiv.className = 'selected-file';
+                    fileDiv.innerHTML = `
+                        <i class="fas fa-file"></i>
+                        <span>${file.filename}</span>
+                        <button type="button" class="remove-file" data-file-id="${file.id}">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    `;
+                    selectedFiles.appendChild(fileDiv);
+                });
+
+                // Add event listeners for remove buttons
+                document.querySelectorAll('.remove-file').forEach(button => {
+                    button.addEventListener('click', function() {
+                        const fileId = this.dataset.fileId;
+                        const hiddenInput = document.createElement('input');
+                        hiddenInput.type = 'hidden';
+                        hiddenInput.name = 'files_to_remove';
+                        hiddenInput.value = fileId;
+                        document.getElementById('announcement-form').appendChild(hiddenInput);
+                        this.parentElement.remove();
+                    });
+                });
+            })
+            .catch(error => {
+                console.error('Error fetching files:', error);
+            });
+
+        modal.style.display = 'flex';
+        isEditing = true;
+    }
+
+    // Close modal
+    function closeModal() {
+        document.getElementById('announcement-modal').style.display = 'none';
+        document.getElementById('announcement-form').reset();
+        document.getElementById('selected-files').innerHTML = '';
+    }
+
+    // Close modal when clicking outside
+    window.addEventListener('click', (event) => {
+        const modal = document.getElementById('announcement-modal');
+        if (event.target === modal) {
+            closeModal();
+        }
+    });
+
+    // Add event listener for the close button
+    document.querySelector('.close-modal').addEventListener('click', closeModal);
+
+    // Handle file selection
+    document.getElementById('announcement-files').addEventListener('change', function(e) {
+        const selectedFiles = document.getElementById('selected-files');
+        
+        Array.from(this.files).forEach(file => {
+            const fileDiv = document.createElement('div');
+            fileDiv.className = 'selected-file';
+            fileDiv.innerHTML = `
+                <i class="fas fa-file"></i>
+                <span>${file.name}</span>
+                <button type="button" class="remove-file">
+                    <i class="fas fa-times"></i>
+                </button>
+            `;
+            selectedFiles.appendChild(fileDiv);
+
+            // Add event listener for remove button
+            const removeButton = fileDiv.querySelector('.remove-file');
+            removeButton.addEventListener('click', function() {
+                fileDiv.remove();
+            });
+        });
+    });
+
+    // Handle form submission
+    document.getElementById('announcement-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const form = e.target;
+        const formData = new FormData(form);
+        const orgId = document.getElementById('announcement-org').value;
+        const announcementId = document.getElementById('announcement-id').value;
+
+        try {
+            let url = isEditing 
+                ? `/announcement/${announcementId}/edit/`
+                : `/organization/${orgId}/create-announcement/`;
+
+            const response = await fetch(url, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                }
+            });
+
+            const data = await response.json();
+            if (data.success) {
+                location.reload();
+            } else {
+                alert(data.error || 'An error occurred');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('An error occurred while saving the announcement');
+        }
+    });
+
+    // Delete announcement
+    async function deleteAnnouncement(announcementId) {
+        if (!confirm('Are you sure you want to delete this announcement?')) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`/announcement/${announcementId}/delete/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                }
+            });
+
+            const data = await response.json();
+            if (data.success) {
+                location.reload();
+            } else {
+                alert(data.error);
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('An error occurred while deleting the announcement');
+        }
+    }
+
+    // Infinite scrolling
+    document.querySelectorAll('.announcements-container').forEach(container => {
+        container.addEventListener('scroll', async function() {
+            if (this.scrollTop + this.clientHeight >= this.scrollHeight - 20) {
+                const orgId = this.dataset.orgId;
+                const currentPage = parseInt(this.dataset.page);
+                
+                try {
+                    const response = await fetch(`/organization/${orgId}/announcements/?page=${currentPage + 1}`);
+                    const data = await response.json();
+                    
+                    if (data.announcements.length > 0) {
+                        data.announcements.forEach(announcement => {
+                            const announcementHtml = `
+                                <div class="announcement-card">
+                                    <div class="announcement-header">
+                                        <div class="announcement-title-group">
+                                            <h4>${announcement.title}</h4>
+                                            <div class="announcement-meta">
+                                                <span><i class="fas fa-building"></i> {{ announcement.organization.name }}</span>
+                                                <span><i class="fas fa-user"></i> {{ announcement.created_by.f_name }} {{ announcement.created_by.l_name }}</span>
+                                                <span><i class="fas fa-clock"></i> {{ announcement.created_at|date:"M d, Y" }}</span>
+                                            </div>
+                                        </div>
+                                        {% if org.owner == request.user %}
+                                            <button class="delete-announcement-btn" onclick="deleteAnnouncement('${announcement.id}')">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        {% endif %}
+                                    </div>
+                                    <div class="announcement-content">
+                                        ${announcement.content}
+                                    </div>
+                                    ${announcement.files.length > 0 ? `
+                                        <div class="announcement-files">
+                                            <h5>Attachments:</h5>
+                                            ${announcement.files.map(file => `
+                                                <a href="${file.url}" class="file-link" target="_blank">
+                                                    <i class="fas fa-file"></i> ${file.filename}
+                                                </a>
+                                            `).join('')}
+                                        </div>
+                                    ` : ''}
+                                </div>
+                            `;
+                            this.insertAdjacentHTML('beforeend', announcementHtml);
+                        });
+                        
+                        this.dataset.page = currentPage + 1;
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                }
+            }
+        });
+    });
+
+    // Add file download handler
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('.file-link').forEach(link => {
+            link.addEventListener('click', async function(e) {
+                e.preventDefault();
+                const fileUrl = this.href;
+                const fileName = this.querySelector('.file-name').textContent;
+                
+                try {
+                    // Fetch the file
+                    const response = await fetch(fileUrl);
+                    const blob = await response.blob();
+                    
+                    // Create a temporary URL for the blob
+                    const blobUrl = window.URL.createObjectURL(blob);
+                    
+                    // Create a temporary link element
+                    const downloadLink = document.createElement('a');
+                    downloadLink.href = blobUrl;
+                    downloadLink.download = fileName;
+                    
+                    // Append to body, click, and remove
+                    document.body.appendChild(downloadLink);
+                    downloadLink.click();
+                    document.body.removeChild(downloadLink);
+                    
+                    // Clean up the blob URL
+                    window.URL.revokeObjectURL(blobUrl);
+                } catch (error) {
+                    console.error('Error downloading file:', error);
+                    alert('Error downloading file. Please try again.');
+                }
+            });
+        });
+    });
+
+    document.addEventListener('DOMContentLoaded', function() {
+        // Update countdown timers every minute
+        setInterval(updateCountdowns, 60000);
+        updateCountdowns();
+
+        // Handle check-in button clicks
+        document.querySelectorAll('.check-in-btn').forEach(button => {
+            button.addEventListener('click', handleCheckIn);
+        });
+    });
+
+    function updateCountdowns() {
+        document.querySelectorAll('.countdown').forEach(countdown => {
+            const minutes = parseInt(countdown.dataset.minutes);
+            const countdownText = countdown.querySelector('.countdown-text');
+            
+            if (countdownText) {
+                if (minutes >= 1440) {
+                    const days = Math.floor(minutes / 1440);
+                    const remainingMinutes = minutes % 1440;
+                    const hours = Math.floor(remainingMinutes / 60);
+                    countdownText.textContent = `${days}d ${hours}h`;
+                } else if (minutes >= 60) {
+                    const hours = Math.floor(minutes / 60);
+                    const remainingMinutes = minutes % 60;
+                    countdownText.textContent = `${hours}h ${remainingMinutes}m`;
+                } else {
+                    countdownText.textContent = `${minutes}m`;
+                }
+            }
+        });
+    }
+
+    function handleCheckIn(event) {
+        const button = event.currentTarget;
+        const eventId = button.dataset.eventId;
+
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                position => {
+                    const data = {
+                        latitude: position.coords.latitude,
+                        longitude: position.coords.longitude
+                    };
+
+                    fetch(`/event/${eventId}/check-in/`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': getCookie('csrftoken')
+                        },
+                        body: JSON.stringify(data)
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            // Replace button with success message
+                            const statusDiv = document.createElement('div');
+                            statusDiv.className = 'check-in-status checked-in';
+                            statusDiv.innerHTML = '<i class="fas fa-check-circle"></i> Checked in';
+                            button.parentNode.replaceChild(statusDiv, button);
+                        } else {
+                            alert(data.error || 'Failed to check in. Please try again.');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        alert('Failed to check in. Please try again.');
+                    });
+                },
+                error => {
+                    alert('Please enable location services to check in.');
+                }
+            );
+        } else {
+            alert('Geolocation is not supported by your browser.');
+        }
+    }
+
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+</script>
 {% endblock %}
