@@ -7,7 +7,7 @@ function updateLocation() {
                 const longitude = position.coords.longitude;
                 
                 // Send location to server
-                fetch('/update-user-location/', {
+                fetch('/update_user_location/', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',

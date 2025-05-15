@@ -1,0 +1,343 @@
+{% extends 'index.html' %}
+{% load static %}
+
+{% block content %}
+<div class="event-details">
+    <div class="event-header">
+        <h2>{{ event.name }}</h2>
+        <div class="event-meta">
+            <span class="event-date">{{ event.date|date:"F j, Y" }}</span>
+            <span class="event-time">{{ event.start_time|time:"g:i A" }} - {{ event.end_time|time:"g:i A" }}</span>
+        </div>
+    </div>
+
+    <div class="event-description">
+        <p>{{ event.description }}</p>
+    </div>
+
+    <div class="attendee-list">
+        <h3>Attendees</h3>
+        <div class="attendee-grid">
+            {% for attendee in event.attendees.all %}
+            <div class="attendee-card">
+                <div class="attendee-info">
+                    <span class="attendee-name">{{ attendee.user.get_full_name }}</span>
+                    {% if attendee.user.tag %}
+                    <span class="attendee-tag" data-tag-color="{{ attendee.user.tag.color }}">
+                        {{ attendee.user.tag.name }}
+                    </span>
+                    {% endif %}
+                </div>
+                {% if user == event.creator or user.is_staff %}
+                <button class="remove-attendee" data-attendee-id="{{ attendee.id }}">
+                    <i class="fas fa-times"></i>
+                </button>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="substitution-requests">
+        <h3>Substitution Requests</h3>
+        <div class="request-list">
+            {% for request in substitution_requests %}
+            <div class="request-card">
+                <div class="request-info">
+                    <span class="requesting-user">{{ request.requesting_user.get_full_name }}</span>
+                    <span class="request-status {{ request.status }}">{{ request.status|title }}</span>
+                    {% if request.requesting_user.tag %}
+                    <span class="user-tag" data-tag-color="{{ request.requesting_user.tag.color }}">
+                        {{ request.requesting_user.tag.name }}
+                    </span>
+                    {% endif %}
+                </div>
+                {% if request.status == 'pending' and user == request.target_user %}
+                <div class="request-actions">
+                    <button class="accept-request" data-request-id="{{ request.id }}">Accept</button>
+                    <button class="reject-request" data-request-id="{{ request.id }}">Reject</button>
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    {% if user in event.attendees.all %}
+    <div class="request-substitution">
+        <h3>Request Substitution</h3>
+        <div class="potential-substitutes">
+            {% for potential_sub in potential_substitutes %}
+            <div class="potential-substitute" data-tag-id="{{ potential_sub.tag.id|default:'' }}">
+                <span class="substitute-name">{{ potential_sub.get_full_name }}</span>
+                {% if potential_sub.tag %}
+                <span class="substitute-tag" data-tag-color="{{ potential_sub.tag.color }}">
+                    {{ potential_sub.tag.name }}
+                </span>
+                {% endif %}
+                <button class="request-sub" data-user-id="{{ potential_sub.id }}">Request</button>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+.event-details {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.event-header {
+    margin-bottom: 20px;
+}
+
+.event-meta {
+    color: #666;
+    margin-top: 8px;
+}
+
+.event-meta span {
+    margin-right: 16px;
+}
+
+.attendee-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 16px;
+    margin-top: 16px;
+}
+
+.attendee-card {
+    background: white;
+    border-radius: 8px;
+    padding: 12px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.attendee-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.attendee-tag, .user-tag, .substitute-tag {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.8em;
+    color: white;
+    margin-left: 8px;
+    background-color: var(--tag-color, var(--medium-blue-slate));
+}
+
+.attendee-tag[data-tag-color], 
+.user-tag[data-tag-color], 
+.substitute-tag[data-tag-color] {
+    background-color: var(--tag-color);
+}
+
+.request-card {
+    background: white;
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.request-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.request-status {
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.9em;
+}
+
+.request-status.pending {
+    background-color: #fff3cd;
+    color: #856404;
+}
+
+.request-status.accepted {
+    background-color: #d4edda;
+    color: #155724;
+}
+
+.request-status.rejected {
+    background-color: #f8d7da;
+    color: #721c24;
+}
+
+.request-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.request-actions button {
+    padding: 4px 12px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9em;
+}
+
+.accept-request {
+    background-color: #28a745;
+    color: white;
+}
+
+.reject-request {
+    background-color: #dc3545;
+    color: white;
+}
+
+.potential-substitutes {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 16px;
+    margin-top: 16px;
+}
+
+.potential-substitute {
+    background: white;
+    border-radius: 8px;
+    padding: 12px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.request-sub {
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 4px 12px;
+    cursor: pointer;
+    font-size: 0.9em;
+}
+
+.request-sub:hover {
+    background-color: #0056b3;
+}
+</style>
+
+<script>
+function updatePotentialSubstitutes() {
+    const currentUserTag = '{{ user.tag.id }}';
+    const potentialSubstitutes = document.querySelectorAll('.potential-substitute');
+    
+    potentialSubstitutes.forEach(substitute => {
+        const substituteTag = substitute.dataset.tagId;
+        if (currentUserTag && substituteTag && currentUserTag !== substituteTag) {
+            substitute.style.display = 'none';
+        } else {
+            substitute.style.display = 'block';
+        }
+    });
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    updatePotentialSubstitutes();
+
+    // Handle substitution requests
+    document.querySelectorAll('.request-sub').forEach(button => {
+        button.addEventListener('click', function() {
+            const userId = this.dataset.userId;
+            const eventId = '{{ event.id }}';
+            
+            fetch('/request_substitution/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({
+                    event_id: eventId,
+                    target_user_id: userId
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Substitution request sent successfully');
+                    location.reload();
+                } else {
+                    alert(data.error || 'Failed to send substitution request');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred while sending the request');
+            });
+        });
+    });
+
+    // Handle request accept/reject
+    document.querySelectorAll('.accept-request, .reject-request').forEach(button => {
+        button.addEventListener('click', function() {
+            const requestId = this.dataset.requestId;
+            const action = this.classList.contains('accept-request') ? 'accept' : 'reject';
+            
+            fetch(`/handle_substitution_request/${requestId}/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({
+                    action: action
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    location.reload();
+                } else {
+                    alert(data.error || 'Failed to process request');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred while processing the request');
+            });
+        });
+    });
+
+    // Initialize tag colors on page load
+    document.querySelectorAll('[data-tag-color]').forEach(element => {
+        const tagColor = element.dataset.tagColor;
+        element.style.setProperty('--tag-color', tagColor);
+    });
+});
+
+// Helper function to get CSRF token
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+</script>
+{% endblock %} 

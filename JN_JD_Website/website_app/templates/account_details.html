@@ -4,6 +4,17 @@
 {% block content %}
 <div class="content">
     <h1>Account Details</h1>
+    {% if messages %}
+    <div class="messages">
+        {% for message in messages %}
+        {% if message.tags == 'error' %}
+        <div class="alert alert-error">
+            {{ message }}
+        </div>
+        {% endif %}
+        {% endfor %}
+    </div>
+    {% endif %}
     <div class="account-details">
         <div class="profile-section">
             <div class="profile-header">
@@ -12,20 +23,30 @@
                 </div>
                 <h2>{{ user.f_name }} {{ user.l_name }}</h2>
             </div>
+            <form method="post" class="profile-form">
+                {% csrf_token %}
             <div class="profile-info">
                 <div class="info-group">
-                    <label>Email:</label>
-                    <p>{{ user.email }}</p>
+                        <label for="first_name">First Name</label>
+                        <input type="text" id="first_name" name="first_name" value="{{ user.f_name }}" class="form-input" required>
+                    </div>
+                    <div class="info-group">
+                        <label for="last_name">Last Name</label>
+                        <input type="text" id="last_name" name="last_name" value="{{ user.l_name }}" class="form-input" required>
+                    </div>
+                    <div class="info-group">
+                        <label for="email">Email</label>
+                        <input type="email" id="email" name="email" value="{{ user.email }}" class="form-input" required>
                 </div>
                 <div class="info-group">
-                    <label>Username:</label>
-                    <p>{{ user.username }}</p>
+                        <label for="username">Username</label>
+                        <input type="text" id="username" name="username" value="{{ user.username }}" class="form-input" required>
+                    </div>
                 </div>
-                <div class="info-group">
-                    <label>Location:</label>
-                    <p>{{ user.location|default:"Not set" }}</p>
+                <div class="form-actions">
+                    <button type="submit" class="save-button">Save Changes</button>
                 </div>
-            </div>
+            </form>
         </div>
     </div>
 </div>
@@ -37,11 +58,30 @@
     padding: 2rem;
 }
 
+.messages {
+    max-width: 800px;
+    margin: 0 auto 2rem;
+}
+
+.alert {
+    padding: 1rem;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    border: 1px solid transparent;
+}
+
+.alert-error {
+    background-color: rgba(220, 53, 69, 0.1);
+    border-color: #dc3545;
+    color: #dc3545;
+}
+
 .profile-section {
-    background: var(--white);
+    background: linear-gradient(to bottom right, var(--card-bg) 0%, var(--dark-bg) 100%);
     border-radius: 12px;
     padding: 2rem;
-    box-shadow: 0 2px 8px var(--shadow);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--medium-blue-slate);
 }
 
 .profile-header {
@@ -49,13 +89,15 @@
     align-items: center;
     gap: 2rem;
     margin-bottom: 2rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--medium-blue-slate);
 }
 
 .profile-avatar {
     width: 100px;
     height: 100px;
     border-radius: 50%;
-    background-color: var(--medium-blue-slate);
+    background: linear-gradient(135deg, var(--medium-blue-slate) 0%, var(--periwinkle) 100%);
     color: var(--white);
     display: flex;
     justify-content: center;
@@ -76,16 +118,68 @@
 }
 
 .info-group label {
-    color: var(--medium-blue-slate);
+    color: var(--text-light);
     font-weight: 500;
 }
 
-.info-group p {
-    margin: 0;
-    padding: 0.5rem;
-    background-color: var(--light-gray);
-    border-radius: 6px;
-    border: 1px solid var(--periwinkle);
+.form-input {
+    width: 100%;
+    padding: 0.75rem;
+    background-color: var(--darker-bg);
+    border: 1px solid var(--medium-blue-slate);
+    border-radius: 8px;
+    color: var(--text-light);
+    transition: all 0.3s ease;
+}
+
+.form-input:focus {
+    outline: none;
+    border-color: var(--periwinkle);
+    box-shadow: 0 0 0 2px rgba(102, 102, 255, 0.2);
+}
+
+.form-actions {
+    margin-top: 2rem;
+    display: flex;
+    justify-content: flex-end;
+}
+
+.save-button {
+    background: linear-gradient(135deg, var(--medium-blue-slate) 0%, var(--periwinkle) 100%);
+    color: var(--white);
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.save-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 102, 255, 0.3);
+}
+
+@media (max-width: 768px) {
+    .account-details {
+        padding: 1rem;
+    }
+    
+    .profile-section {
+        padding: 1.5rem;
+    }
+    
+    .profile-header {
+        flex-direction: column;
+        text-align: center;
+        gap: 1rem;
+    }
+    
+    .profile-avatar {
+        width: 80px;
+        height: 80px;
+        font-size: 2.5rem;
+    }
 }
 </style>
 {% endblock %} 

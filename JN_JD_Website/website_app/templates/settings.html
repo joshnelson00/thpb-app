@@ -7,50 +7,86 @@
     <div class="settings-container">
         <div class="settings-section">
             <h2>Account Settings</h2>
-            <form class="settings-form">
+            <form class="settings-form" method="post">
+                {% csrf_token %}
                 <div class="form-group">
                     <label for="email">Email Notifications</label>
                     <div class="toggle-switch">
-                        <input type="checkbox" id="email" checked>
+                        <input type="checkbox" id="email" name="email_notifications" {% if user.email_notifications %}checked{% endif %}>
                         <label for="email"></label>
                     </div>
                 </div>
                 <div class="form-group">
                     <label for="push">Push Notifications</label>
                     <div class="toggle-switch">
-                        <input type="checkbox" id="push" checked>
+                        <input type="checkbox" id="push" name="push_notifications" {% if user.push_notifications %}checked{% endif %}>
                         <label for="push"></label>
                     </div>
                 </div>
                 <div class="form-group">
                     <label for="theme">Dark Mode</label>
                     <div class="toggle-switch">
-                        <input type="checkbox" id="theme">
+                        <input type="checkbox" id="theme" name="dark_mode" {% if user.dark_mode %}checked{% endif %}>
                         <label for="theme"></label>
                     </div>
+                </div>
+                <div class="form-group">
+                    <label for="language">Language</label>
+                    <select id="language" name="language" class="form-select">
+                        <option value="en" {% if user.language == 'en' %}selected{% endif %}>English</option>
+                        <option value="es" {% if user.language == 'es' %}selected{% endif %}>Español</option>
+                        <option value="fr" {% if user.language == 'fr' %}selected{% endif %}>Français</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="timezone">Timezone</label>
+                    <select id="timezone" name="timezone" class="form-select">
+                        {% for tz in timezones %}
+                        <option value="{{ tz }}" {% if user.timezone == tz %}selected{% endif %}>{{ tz }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="save-button">Save Changes</button>
                 </div>
             </form>
         </div>
 
         <div class="settings-section">
             <h2>Privacy Settings</h2>
-            <form class="settings-form">
+            <form class="settings-form" method="post">
+                {% csrf_token %}
                 <div class="form-group">
-                    <label for="profile">Profile Visibility</label>
-                    <select id="profile" class="settings-select">
-                        <option value="public">Public</option>
-                        <option value="private">Private</option>
-                        <option value="connections">Connections Only</option>
+                    <label for="profile_visibility">Profile Visibility</label>
+                    <select id="profile_visibility" name="profile_visibility" class="form-select">
+                        <option value="public" {% if user.profile_visibility == 'public' %}selected{% endif %}>Public</option>
+                        <option value="private" {% if user.profile_visibility == 'private' %}selected{% endif %}>Private</option>
+                        <option value="organization" {% if user.profile_visibility == 'organization' %}selected{% endif %}>Organization Only</option>
                     </select>
                 </div>
                 <div class="form-group">
-                    <label for="location">Location Sharing</label>
-                    <select id="location" class="settings-select">
-                        <option value="enabled">Enabled</option>
-                        <option value="disabled">Disabled</option>
-                    </select>
+                    <label for="activity_status">Show Activity Status</label>
+                    <div class="toggle-switch">
+                        <input type="checkbox" id="activity_status" name="show_activity" {% if user.show_activity %}checked{% endif %}>
+                        <label for="activity_status"></label>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="save-button">Save Changes</button>
                 </div>
             </form>
+        </div>
+
+        <div class="settings-section danger-zone">
+            <h2>Danger Zone</h2>
+            <div class="danger-actions">
+                <button class="danger-button" onclick="exportData()">
+                    <i class="fas fa-download"></i> Export My Data
+                </button>
+                <button class="danger-button delete" onclick="deleteAccount()">
+                    <i class="fas fa-trash"></i> Delete Account
+                </button>
+            </div>
         </div>
     </div>
 </div>
@@ -63,18 +99,19 @@
 }
 
 .settings-section {
-    background-color: var(--white);
+    background: linear-gradient(to bottom right, var(--card-bg) 0%, var(--dark-bg) 100%);
     border-radius: 12px;
     padding: 2rem;
     margin-bottom: 2rem;
-    box-shadow: 0 2px 8px var(--shadow);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--medium-blue-slate);
 }
 
 .settings-section h2 {
-    color: var(--rich-black);
+    color: var(--text-light);
     margin-bottom: 1.5rem;
     padding-bottom: 0.5rem;
-    border-bottom: 2px solid var(--medium-blue-slate);
+    border-bottom: 1px solid var(--medium-blue-slate);
 }
 
 .settings-form {
@@ -86,28 +123,34 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 1rem;
 }
 
 .form-group label {
-    color: var(--rich-black);
+    color: var(--text-light);
     font-weight: 500;
 }
 
-.settings-select {
+.form-select {
+    background-color: var(--darker-bg);
+    color: var(--text-light);
+    border: 1px solid var(--medium-blue-slate);
     padding: 0.5rem;
-    border: 1px solid var(--periwinkle);
     border-radius: 6px;
-    background-color: var(--white);
-    color: var(--rich-black);
     min-width: 200px;
 }
 
-/* Toggle Switch Styles */
+.form-select:focus {
+    outline: none;
+    border-color: var(--periwinkle);
+    box-shadow: 0 0 0 2px rgba(102, 102, 255, 0.2);
+}
+
 .toggle-switch {
     position: relative;
     display: inline-block;
-    width: 60px;
-    height: 34px;
+    width: 50px;
+    height: 24px;
 }
 
 .toggle-switch input {
@@ -123,29 +166,164 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background-color: #ccc;
+    background-color: var(--darker-bg);
     transition: .4s;
-    border-radius: 34px;
+    border-radius: 24px;
+    border: 1px solid var(--medium-blue-slate);
 }
 
 .toggle-switch label:before {
     position: absolute;
     content: "";
-    height: 26px;
-    width: 26px;
+    height: 16px;
+    width: 16px;
     left: 4px;
-    bottom: 4px;
-    background-color: white;
+    bottom: 3px;
+    background-color: var(--text-light);
     transition: .4s;
     border-radius: 50%;
 }
 
 .toggle-switch input:checked + label {
-    background-color: var(--medium-blue-slate);
+    background: linear-gradient(135deg, var(--medium-blue-slate) 0%, var(--periwinkle) 100%);
 }
 
 .toggle-switch input:checked + label:before {
     transform: translateX(26px);
 }
+
+.form-actions {
+    margin-top: 1rem;
+    display: flex;
+    justify-content: flex-end;
+}
+
+.save-button {
+    background: linear-gradient(135deg, var(--medium-blue-slate) 0%, var(--periwinkle) 100%);
+    color: var(--white);
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.save-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 102, 255, 0.3);
+}
+
+.danger-zone {
+    border-color: #dc3545;
+}
+
+.danger-zone h2 {
+    color: #dc3545;
+    border-bottom-color: #dc3545;
+}
+
+.danger-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-end;
+}
+
+.danger-button {
+    background: none;
+    border: 1px solid var(--medium-blue-slate);
+    color: var(--text-light);
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.3s ease;
+}
+
+.danger-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.danger-button.delete {
+    border-color: #dc3545;
+    color: #dc3545;
+}
+
+.danger-button.delete:hover {
+    background: rgba(220, 53, 69, 0.1);
+}
+
+@media (max-width: 768px) {
+    .settings-container {
+        padding: 1rem;
+    }
+    
+    .settings-section {
+        padding: 1.5rem;
+    }
+    
+    .form-group {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+    
+    .form-select {
+        width: 100%;
+    }
+    
+    .danger-actions {
+        flex-direction: column;
+    }
+    
+    .danger-button {
+        width: 100%;
+        justify-content: center;
+    }
+}
 </style>
+
+<script>
+function exportData() {
+    // Add AJAX call to export user data
+    fetch('/settings/export-data/', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+        },
+    })
+    .then(response => response.blob())
+    .then(blob => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'user-data.json';
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+    });
+}
+
+function deleteAccount() {
+    if (confirm('Are you sure you want to delete your account? This action cannot be undone.')) {
+        // Add AJAX call to delete account
+        fetch('/settings/delete-account/', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+            },
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                window.location.href = '/signin/';
+            }
+        });
+    }
+}
+</script>
 {% endblock %} 

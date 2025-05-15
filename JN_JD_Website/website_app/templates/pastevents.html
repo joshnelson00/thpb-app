@@ -306,14 +306,15 @@
     .action-btn.delete-event {
         background: var(--error-red);
         color: var(--white);
-        border: none;
-        transition: all 0.3s ease;
+        border: 1px solid var(--error-red);
+        transition: all 0.2s ease-in-out;
     }
 
     .action-btn.delete-event:hover {
-        background: var(--error-red-dark);
+        background: var(--white);
         transform: translateY(-2px);
-        color: var(--white);
+        color: var(--error-red);
+        border-color: var(--white);
     }
 
     .action-btn.delete-event i {
@@ -358,7 +359,7 @@
         margin: 0.1rem;
         font-size: 0.8rem;
         white-space: nowrap;
-        border: 1px solid var(--group-color, var(--medium-blue-slate));
+        border: 1px solid var(--medium-blue-slate);
         transition: all 0.3s ease;
     }
 
@@ -366,6 +367,7 @@
         transform: translateY(-2px);
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
         background: var(--dark-bg);
+        border-color: var(--periwinkle);
     }
 
     .event-group i {

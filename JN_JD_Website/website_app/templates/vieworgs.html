@@ -16,7 +16,12 @@
                     {% for org in owned_organizations %}
                         <div class="org-card">
                             <div class="org-card-header">
-                                <h3>{{ org.name }}</h3>
+                                <div class="org-name-container">
+                                    <h3 class="org-name">{{ org.name }}</h3>
+                                    <button class="edit-org-name" data-org-id="{{ org.id }}" title="Edit Organization Name">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                </div>
                                 <span class="org-badge owner">Owner</span>
                             </div>
                             <div class="org-card-content">
@@ -24,6 +29,9 @@
                                 <div class="org-actions">
                                     <a href="{% url 'editgroups' org.id %}" class="org-button">
                                         <i class="fas fa-users"></i> Manage Groups
+                                    </a>
+                                    <a href="{% url 'manage_tags' org.id %}" class="org-button">
+                                        <i class="fas fa-tags"></i> Manage Tags
                                     </a>
                                 </div>
                             </div>
@@ -70,6 +78,97 @@
         {% endif %}
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const editButtons = document.querySelectorAll('.edit-org-name');
+    
+    editButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const orgId = this.dataset.orgId;
+            const orgNameContainer = this.closest('.org-name-container');
+            const orgNameElement = orgNameContainer.querySelector('.org-name');
+            const currentName = orgNameElement.textContent;
+            
+            // Create input field
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.value = currentName;
+            input.className = 'org-name-input';
+            
+            // Replace name with input
+            orgNameElement.style.display = 'none';
+            this.style.display = 'none';
+            orgNameContainer.appendChild(input);
+            input.focus();
+            
+            // Handle input events
+            input.addEventListener('blur', function() {
+                saveOrgName(orgId, this.value, orgNameElement, button, orgNameContainer);
+            });
+            
+            input.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    this.blur();
+                }
+            });
+        });
+    });
+    
+    function saveOrgName(orgId, newName, orgNameElement, editButton, container) {
+        if (newName.trim() === '') {
+            newName = orgNameElement.textContent;
+        }
+        
+        fetch(`/update_org_name/${orgId}/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify({
+                name: newName
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                orgNameElement.textContent = newName;
+            } else {
+                alert(data.error || 'Failed to update organization name');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to update organization name');
+        })
+        .finally(() => {
+            // Remove input and restore original elements
+            const input = container.querySelector('.org-name-input');
+            if (input) {
+                input.remove();
+            }
+            orgNameElement.style.display = '';
+            editButton.style.display = '';
+        });
+    }
+    
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+});
+</script>
 
 <style>
     .home-container {
@@ -180,10 +279,46 @@
         align-items: center;
     }
 
-    .org-card-header h3 {
+    .org-name-container {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .org-name {
         color: var(--white);
         margin: 0;
         font-size: 1.25rem;
+    }
+
+    .edit-org-name {
+        background: none;
+        border: none;
+        color: var(--white);
+        cursor: pointer;
+        padding: 0.25rem;
+        opacity: 0.7;
+        transition: opacity 0.3s ease;
+    }
+
+    .edit-org-name:hover {
+        opacity: 1;
+    }
+
+    .org-name-input {
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        color: var(--white);
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        font-size: 1.25rem;
+        width: 200px;
+    }
+
+    .org-name-input:focus {
+        outline: none;
+        border-color: var(--white);
+        background: rgba(255, 255, 255, 0.15);
     }
 
     .org-badge {

@@ -9,7 +9,7 @@
             <h2>Frequently Asked Questions</h2>
             <div class="faq-list">
                 <div class="faq-item">
-                    <div class="faq-question">
+                    <div class="faq-question" onclick="toggleFAQ(this)">
                         <h3>How do I create an event?</h3>
                         <span class="faq-toggle">+</span>
                     </div>
@@ -18,7 +18,7 @@
                     </div>
                 </div>
                 <div class="faq-item">
-                    <div class="faq-question">
+                    <div class="faq-question" onclick="toggleFAQ(this)">
                         <h3>How do I manage my groups?</h3>
                         <span class="faq-toggle">+</span>
                     </div>
@@ -27,7 +27,7 @@
                     </div>
                 </div>
                 <div class="faq-item">
-                    <div class="faq-question">
+                    <div class="faq-question" onclick="toggleFAQ(this)">
                         <h3>How do I update my profile?</h3>
                         <span class="faq-toggle">+</span>
                     </div>
@@ -35,22 +35,82 @@
                         <p>Click on your profile picture in the top right corner and select "Account Details" to update your profile information.</p>
                     </div>
                 </div>
+                <div class="faq-item">
+                    <div class="faq-question" onclick="toggleFAQ(this)">
+                        <h3>How do I check in to an event?</h3>
+                        <span class="faq-toggle">+</span>
+                    </div>
+                    <div class="faq-answer">
+                        <p>When you arrive at an event location, click on the event in your upcoming events list and use the "Check In" button. Make sure you're within the event's geofence area.</p>
+                    </div>
+                </div>
+                <div class="faq-item">
+                    <div class="faq-question" onclick="toggleFAQ(this)">
+                        <h3>How do I request a substitution?</h3>
+                        <span class="faq-toggle">+</span>
+                    </div>
+                    <div class="faq-answer">
+                        <p>To request a substitution, go to the event details page and click on "Request Substitution". Select a replacement from your group members and provide a reason for the substitution.</p>
+                    </div>
+                </div>
             </div>
         </div>
 
         <div class="help-section">
             <h2>Contact Support</h2>
-            <form class="support-form">
+            <form class="support-form" method="post">
+                {% csrf_token %}
                 <div class="form-group">
                     <label for="subject">Subject</label>
-                    <input type="text" id="subject" placeholder="What do you need help with?">
+                    <input type="text" id="subject" name="subject" placeholder="What do you need help with?" required>
+                </div>
+                <div class="form-group">
+                    <label for="category">Category</label>
+                    <select id="category" name="category" required>
+                        <option value="">Select a category</option>
+                        <option value="technical">Technical Issue</option>
+                        <option value="account">Account Issue</option>
+                        <option value="event">Event Management</option>
+                        <option value="group">Group Management</option>
+                        <option value="other">Other</option>
+                    </select>
                 </div>
                 <div class="form-group">
                     <label for="message">Message</label>
-                    <textarea id="message" rows="5" placeholder="Please describe your issue in detail"></textarea>
+                    <textarea id="message" name="message" rows="5" placeholder="Please describe your issue in detail" required></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="priority">Priority</label>
+                    <select id="priority" name="priority" required>
+                        <option value="low">Low</option>
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
+                    </select>
                 </div>
                 <button type="submit" class="submit-button">Send Message</button>
             </form>
+        </div>
+
+        <div class="help-section">
+            <h2>Quick Links</h2>
+            <div class="quick-links">
+                <a href="{% url 'createevent' %}" class="quick-link">
+                    <i class="fas fa-calendar-plus"></i>
+                    <span>Create Event</span>
+                </a>
+                <a href="{% url 'creategroup' %}" class="quick-link">
+                    <i class="fas fa-users"></i>
+                    <span>Create Group</span>
+                </a>
+                <a href="{% url 'createorg' %}" class="quick-link">
+                    <i class="fas fa-building"></i>
+                    <span>Create Organization</span>
+                </a>
+                <a href="{% url 'settings' %}" class="quick-link">
+                    <i class="fas fa-cog"></i>
+                    <span>Settings</span>
+                </a>
+            </div>
         </div>
     </div>
 </div>
@@ -63,18 +123,19 @@
 }
 
 .help-section {
-    background-color: var(--white);
+    background: linear-gradient(to bottom right, var(--card-bg) 0%, var(--dark-bg) 100%);
     border-radius: 12px;
     padding: 2rem;
     margin-bottom: 2rem;
-    box-shadow: 0 2px 8px var(--shadow);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--medium-blue-slate);
 }
 
 .help-section h2 {
-    color: var(--rich-black);
+    color: var(--text-light);
     margin-bottom: 1.5rem;
     padding-bottom: 0.5rem;
-    border-bottom: 2px solid var(--medium-blue-slate);
+    border-bottom: 1px solid var(--medium-blue-slate);
 }
 
 .faq-list {
@@ -84,34 +145,43 @@
 }
 
 .faq-item {
-    border: 1px solid var(--periwinkle);
+    border: 1px solid var(--medium-blue-slate);
     border-radius: 8px;
     overflow: hidden;
 }
 
 .faq-question {
     padding: 1rem;
-    background-color: var(--columbia-blue);
+    background: linear-gradient(to right, var(--card-bg) 0%, var(--dark-bg) 100%);
     cursor: pointer;
     display: flex;
     justify-content: space-between;
     align-items: center;
+    transition: all 0.3s ease;
+}
+
+.faq-question:hover {
+    background: linear-gradient(to right, var(--dark-bg) 0%, var(--card-bg) 100%);
 }
 
 .faq-question h3 {
     margin: 0;
-    color: var(--rich-black);
+    color: var(--text-light);
     font-size: 1.1rem;
 }
 
 .faq-toggle {
     font-size: 1.5rem;
-    color: var(--medium-blue-slate);
+    color: var(--periwinkle);
+    transition: transform 0.3s ease;
 }
 
 .faq-answer {
     padding: 1rem;
     display: none;
+    background: var(--darker-bg);
+    color: var(--text-light);
+    border-top: 1px solid var(--medium-blue-slate);
 }
 
 .faq-item.active .faq-answer {
@@ -134,43 +204,101 @@
 }
 
 .form-group label {
-    color: var(--rich-black);
+    color: var(--text-light);
     font-weight: 500;
 }
 
 .form-group input,
+.form-group select,
 .form-group textarea {
     padding: 0.75rem;
-    border: 1px solid var(--periwinkle);
-    border-radius: 6px;
-    font-family: inherit;
+    background-color: var(--darker-bg);
+    border: 1px solid var(--medium-blue-slate);
+    border-radius: 8px;
+    color: var(--text-light);
+    transition: all 0.3s ease;
 }
 
-.form-group textarea {
-    resize: vertical;
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+    outline: none;
+    border-color: var(--periwinkle);
+    box-shadow: 0 0 0 2px rgba(102, 102, 255, 0.2);
 }
 
 .submit-button {
-    background-color: var(--medium-blue-slate);
+    background: linear-gradient(135deg, var(--medium-blue-slate) 0%, var(--periwinkle) 100%);
     color: var(--white);
     border: none;
     padding: 0.75rem 1.5rem;
-    border-radius: 6px;
+    border-radius: 8px;
     cursor: pointer;
     font-weight: 500;
-    transition: background-color 0.3s ease;
+    transition: all 0.3s ease;
 }
 
 .submit-button:hover {
-    background-color: var(--periwinkle);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 102, 255, 0.3);
+}
+
+.quick-links {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+.quick-link {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem;
+    background: linear-gradient(to right, var(--card-bg) 0%, var(--dark-bg) 100%);
+    border: 1px solid var(--medium-blue-slate);
+    border-radius: 8px;
+    color: var(--text-light);
+    text-decoration: none;
+    transition: all 0.3s ease;
+}
+
+.quick-link:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    background: linear-gradient(to right, var(--dark-bg) 0%, var(--card-bg) 100%);
+}
+
+.quick-link i {
+    font-size: 1.2rem;
+    color: var(--periwinkle);
+}
+
+@media (max-width: 768px) {
+    .help-container {
+        padding: 1rem;
+    }
+    
+    .help-section {
+        padding: 1.5rem;
+    }
+    
+    .quick-links {
+        grid-template-columns: 1fr;
+    }
 }
 </style>
 
 <script>
+function toggleFAQ(element) {
+    const faqItem = element.parentElement;
+    faqItem.classList.toggle('active');
+}
+
+// Add smooth scrolling for FAQ links
 document.querySelectorAll('.faq-question').forEach(question => {
     question.addEventListener('click', () => {
-        const faqItem = question.parentElement;
-        faqItem.classList.toggle('active');
+        const answer = question.nextElementSibling;
+        answer.style.maxHeight = answer.style.maxHeight ? null : answer.scrollHeight + "px";
     });
 });
 </script>

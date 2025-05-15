@@ -10,6 +10,7 @@ class User(AbstractUser):
     l_name = models.CharField(max_length=255)
     latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    tag = models.ForeignKey('Tag', on_delete=models.SET_NULL, null=True, blank=True, related_name='users')
 
     groups = models.ManyToManyField(
         "auth.Group",
@@ -261,3 +262,17 @@ class SubstitutionRequest(models.Model):
 
     def __str__(self):
         return f"{self.requesting_user.get_full_name()} → {self.target_user.get_full_name()} for {self.event.name}"
+
+class Tag(models.Model):
+    name = models.CharField(max_length=255)
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='tags')
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='created_tags')
+    date_created = models.DateTimeField(auto_now_add=True)
+    color = models.CharField(max_length=7, default='#6666ff')  # Default to medium-blue-slate
+
+    class Meta:
+        db_table = 'Tag'
+        unique_together = (('name', 'organization'),)  # Tag names must be unique within an organization
+
+    def __str__(self):
+        return self.name

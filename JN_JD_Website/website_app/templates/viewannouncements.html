@@ -128,6 +128,8 @@
         max-width: 1200px;
         margin: 0 auto;
         padding: 2rem;
+        width: 100%;
+        box-sizing: border-box;
     }
 
     .page-header {
@@ -165,6 +167,8 @@
         padding-left: 0.5rem;
         padding-right: 0.5rem;
         padding-bottom: 1rem;
+        width: 100%;
+        box-sizing: border-box;
     }
 
     .announcement-card {
@@ -174,6 +178,11 @@
         padding: 1.5rem;
         position: relative;
         transition: all 0.3s ease;
+        width: 100%;
+        box-sizing: border-box;
+        overflow-wrap: break-word;
+        word-wrap: break-word;
+        word-break: break-word;
     }
 
     .announcement-card:hover {
@@ -285,11 +294,19 @@
         line-height: 1.8;
         margin-bottom: 1.5rem;
         font-size: 1rem;
+        width: 100%;
+        overflow-wrap: break-word;
+        word-wrap: break-word;
+        word-break: break-word;
     }
 
     .announcement-content p {
         color: var(--white);
         margin: 0.5rem 0;
+        width: 100%;
+        overflow-wrap: break-word;
+        word-wrap: break-word;
+        word-break: break-word;
     }
 
     .announcement-files {
@@ -495,6 +512,7 @@
         background: var(--darker-bg);
         color: var(--text-light);
         font-size: 1rem;
+        font-family: inherit;
         transition: all 0.3s ease;
     }
 
@@ -506,9 +524,24 @@
     }
 
     .form-group textarea {
+        width: 100%;
+        padding: 1rem;
+        border: 1px solid var(--medium-blue-slate);
+        border-radius: 8px;
+        background: var(--darker-bg);
+        color: var(--text-light);
+        font-size: 1rem;
+        font-family: inherit;
+        transition: all 0.3s ease;
         min-height: 200px;
         resize: vertical;
         line-height: 1.6;
+    }
+
+    .form-group textarea:focus {
+        border-color: var(--periwinkle);
+        box-shadow: 0 0 0 2px rgba(102, 102, 255, 0.2);
+        outline: none;
     }
 
     .file-upload-wrapper {
@@ -608,43 +641,202 @@
 
     @media (max-width: 768px) {
         .content {
-            padding: 1rem;
+            padding: 0.75rem;
+            width: 100%;
+            max-width: 100%;
+            box-sizing: border-box;
+            overflow-x: hidden;
         }
 
         .page-header {
             flex-direction: column;
             align-items: flex-start;
             gap: 1rem;
+            width: 100%;
+            box-sizing: border-box;
         }
 
         .page-header h1 {
             font-size: 2rem;
+            width: 100%;
+            box-sizing: border-box;
         }
 
         .create-announcement-btn {
             width: 100%;
             justify-content: center;
+            box-sizing: border-box;
+        }
+
+        .announcements-container {
+            padding: 0.25rem;
+            width: 100%;
+            margin: 0;
+            box-sizing: border-box;
+            overflow-x: hidden;
+        }
+
+        .announcement-card {
+            padding: 0.5rem;
+            margin: 0;
+            width: 100%;
+            box-sizing: border-box;
+            overflow-x: hidden;
         }
 
         .announcement-header {
             flex-direction: column;
+            align-items: flex-start;
+            gap: 0.5rem;
+            width: 100%;
+            box-sizing: border-box;
+            position: relative;
+        }
+
+        .announcement-title-group {
+            width: 100%;
+            box-sizing: border-box;
         }
 
         .announcement-actions {
+            position: absolute;
+            top: 0;
+            right: 0;
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .announcement-meta {
+            font-size: 0.75rem;
+            display: flex;
+            flex-wrap: nowrap;
+            gap: 0.5rem;
             width: 100%;
-            justify-content: flex-end;
+            padding: 0.5rem 0;
+            border-top: 1px solid var(--medium-blue-slate);
+            margin-top: 0.5rem;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none; /* Firefox */
+            -ms-overflow-style: none; /* IE and Edge */
+        }
+
+        .announcement-meta::-webkit-scrollbar {
+            display: none; /* Chrome, Safari, Opera */
+        }
+
+        .announcement-meta span {
+            display: flex;
+            align-items: center;
+            gap: 0;
+            padding: 0.25rem 0;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .announcement-meta i {
+            width: 12px;
+            text-align: center;
+            color: var(--periwinkle);
+            font-size: 0.8rem;
+            margin-right: 0.2rem;
+        }
+
+        .announcement-title-group h3 {
+            margin-bottom: 0.5rem;
+        }
+
+        .announcement-content {
+            font-size: 0.9rem;
+            line-height: 1.6;
+            width: 100%;
+            box-sizing: border-box;
+            overflow-x: hidden;
+        }
+
+        .announcement-content p {
+            font-size: 0.95rem;
+            width: 100%;
+            box-sizing: border-box;
+            overflow-wrap: break-word;
+            word-wrap: break-word;
+            word-break: break-word;
+        }
+
+        .announcement-files {
+            padding: 0.75rem;
+            width: 100%;
+            box-sizing: border-box;
+            overflow-x: hidden;
         }
 
         .file-grid {
             grid-template-columns: 1fr;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .file-link {
+            padding: 0.5rem;
+            font-size: 0.85rem;
+            width: 100%;
+            box-sizing: border-box;
+            overflow: hidden;
+        }
+
+        .file-name {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
 
         .form-actions {
             flex-direction: column;
+            width: 100%;
+            box-sizing: border-box;
         }
 
         .submit-btn, .cancel-btn {
             width: 100%;
+            box-sizing: border-box;
+        }
+
+        .modal-content {
+            width: 95%;
+            padding: 1rem;
+            box-sizing: border-box;
+            overflow-x: hidden;
+        }
+    }
+
+    @media (max-width: 578px) {
+        .content {
+            padding: 0.5rem;
+        }
+
+        .announcements-container {
+            padding: 0.15rem;
+        }
+
+        .announcement-card {
+            padding: 0.75rem;
+        }
+
+        .announcement-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 0.5rem;
+        }
+
+        .announcement-meta {
+            font-size: 0.7rem;
+            gap: 0.4rem;
+        }
+
+        .announcement-meta i {
+            width: 10px;
+            font-size: 0.75rem;
+            margin-right: 0.15rem;
         }
     }
 </style>
